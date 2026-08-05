@@ -91,6 +91,8 @@ $qs = extra_qs($parentField, $parentId, $parentEntityName);
                     $val = $row[$item['name']] ?? null;
                     if ($item['field_type'] === 'Boolean') {
                         echo $val ? e(t('yes')) : e(t('no'));
+                    } elseif ($item['field_type'] === 'Email' && $val) {
+                        echo '<a href="mailto:' . e($val) . '">' . e($val) . '</a>';
                     } else {
                         echo e((string) $val);
                     }

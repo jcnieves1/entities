@@ -52,12 +52,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data[$f['name']] = $_POST['field'][$f['name']] ?? null;
         if ($f['field_type'] === 'Boolean') {
             $data[$f['name']] = isset($_POST['field'][$f['name']]) ? 1 : 0;
+        } elseif ($f['field_type'] === 'Email' && $data[$f['name']] !== null) {
+            // Trim before validating so incidental leading/trailing spaces
+            // (e.g. from copy-paste) don't fail FILTER_VALIDATE_EMAIL, which
+            // rejects surrounding whitespace even though it's harmless here.
+            $data[$f['name']] = trim($data[$f['name']]);
         }
     }
     // Required-field validation
     foreach ($fields as $f) {
         if ($f['is_required'] && ($data[$f['name']] === null || $data[$f['name']] === '')) {
             $error = $f['label'] . ' is required.';
+        }
+        if ($f['field_type'] === 'Email' && !empty($data[$f['name']]) && !is_valid_email($data[$f['name']])) {
+            $error = sprintf(t('invalid_email_field'), $f['label']);
         }
     }
 
@@ -119,6 +127,10 @@ include __DIR__ . '/includes/header.php';
             <input type="number" step="1" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
           <?php elseif ($f['field_type'] === 'Float'): ?>
             <input type="number" step="any" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
+          <?php elseif ($f['field_type'] === 'Email'): ?>
+            <input type="email" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>"
+                   maxlength="<?= (int) ($f['max_length'] ?: 255) ?>" pattern="[^@\s]+@[^@\s]+\.[^@\s]+"
+                   placeholder="name@example.com" <?= $f['is_required'] ? 'required' : '' ?>>
           <?php else: ?>
             <input type="text" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" maxlength="<?= (int) ($f['max_length'] ?: 255) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
           <?php endif; ?>

@@ -52,4 +52,13 @@ function run_migrations(): void
     if (!$stmt->fetchColumn()) {
         $pdo->exec('ALTER TABLE entity_relationships ADD COLUMN sort_order INT DEFAULT 0');
     }
+
+    // entity_fields.field_type: add the 'Email' field type to the ENUM.
+    $stmt = $pdo->prepare("SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'entity_fields' AND COLUMN_NAME = 'field_type'");
+    $stmt->execute();
+    $columnType = (string) $stmt->fetchColumn();
+    if ($columnType !== '' && strpos($columnType, "'Email'") === false) {
+        $pdo->exec("ALTER TABLE entity_fields MODIFY COLUMN field_type ENUM('Int','String','Date','Boolean','Float','Email') NOT NULL");
+    }
 }

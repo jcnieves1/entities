@@ -149,5 +149,8 @@ return [
     // Admin: entity-reference field types
     'native_types' => 'Native types',
     'entity_reference_types' => 'Existing entities (creates a relationship)',
-    'field_type_entity_hint' => 'Pick a native type (Int, String, Date, Boolean, Float) for a plain field, or pick an existing entity to make this field a reference — it will show up as a dropdown of that entity\'s rows, and the relationship between the two entities is created automatically.',
+    'field_type_entity_hint' => 'Pick a native type (Int, String, Date, Boolean, Float, Email) for a plain field, or pick an existing entity to make this field a reference — it will show up as a dropdown of that entity\'s rows, and the relationship between the two entities is created automatically.',
+
+    // Field type: Email
+    'invalid_email_field' => '%s must be a valid email address.',
 ];

@@ -68,7 +68,7 @@ if (!$connError && !$alreadyInstalled && $_SERVER['REQUEST_METHOD'] === 'POST') 
             entity_id INT NOT NULL,
             name VARCHAR(64) NOT NULL,
             label VARCHAR(150) NOT NULL,
-            field_type ENUM('Int','String','Date','Boolean','Float') NOT NULL,
+            field_type ENUM('Int','String','Date','Boolean','Float','Email') NOT NULL,
             max_length INT DEFAULT NULL,
             default_value VARCHAR(255) DEFAULT NULL,
             is_required TINYINT(1) DEFAULT 0,

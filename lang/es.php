@@ -149,5 +149,8 @@ return [
     // Admin: campos de tipo entidad (referencia)
     'native_types' => 'Tipos nativos',
     'entity_reference_types' => 'Entidades existentes (crea una relación)',
-    'field_type_entity_hint' => 'Elige un tipo nativo (Int, String, Date, Boolean, Float) para un campo simple, o elige una entidad existente para que este campo sea una referencia: aparecerá como una lista desplegable con las filas de esa entidad, y la relación entre ambas entidades se crea automáticamente.',
+    'field_type_entity_hint' => 'Elige un tipo nativo (Int, String, Date, Boolean, Float, Email) para un campo simple, o elige una entidad existente para que este campo sea una referencia: aparecerá como una lista desplegable con las filas de esa entidad, y la relación entre ambas entidades se crea automáticamente.',
+
+    // Tipo de campo: Email
+    'invalid_email_field' => '%s debe ser una dirección de correo electrónico válida.',
 ];

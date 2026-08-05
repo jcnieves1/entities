@@ -30,10 +30,24 @@ function sql_type_for(string $type, ?int $maxLen = null): string
         case 'Date':
             return 'DATE';
         case 'String':
+        case 'Email':
         default:
+            // Email is stored as a plain string column - the "Email" type only
+            // changes how the UI renders/validates it, not the SQL storage.
             $len = $maxLen && $maxLen > 0 && $maxLen <= 65535 ? $maxLen : 255;
             return $len > 255 ? "TEXT" : "VARCHAR($len)";
     }
+}
+
+/**
+ * True if $value is a well-formed email address. Uses PHP's built-in
+ * FILTER_VALIDATE_EMAIL (a thoroughly-tested RFC-aware validator) rather
+ * than a hand-rolled regex, which is the standard, robust way to do this
+ * validation in PHP.
+ */
+function is_valid_email(string $value): bool
+{
+    return filter_var($value, FILTER_VALIDATE_EMAIL) !== false;
 }
 
 // ---------------------------------------------------------------------
@@ -297,6 +311,10 @@ function cast_value_for_save(array $field, $raw)
             return !empty($raw) && $raw !== '0' ? 1 : 0;
         case 'Date':
             return $raw;
+        case 'Email':
+            // Normalize so lookups/comparisons are consistent regardless of
+            // how the user typed it in (extra spaces, mixed case).
+            return strtolower(trim((string) $raw));
         default:
             return (string) $raw;
     }

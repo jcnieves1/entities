@@ -19,7 +19,7 @@ define('DEFAULT_THEME', 'light');
 define('ROWS_PER_PAGE', 20);
 
 // Field types supported by the entity engine
-define('FIELD_TYPES', ['Int', 'String', 'Date', 'Boolean', 'Float']);
+define('FIELD_TYPES', ['Int', 'String', 'Date', 'Boolean', 'Float', 'Email']);
 
 // ---- Error reporting (disable display_errors in production) ----
 error_reporting(E_ALL);

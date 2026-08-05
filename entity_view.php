@@ -70,7 +70,15 @@ include __DIR__ . '/includes/header.php';
         <?php if ($item['kind'] === 'field'): $val = $row[$item['name']] ?? null; ?>
           <tr>
             <th style="width:220px;"><?= e($item['label']) ?></th>
-            <td><?= $item['field_type'] === 'Boolean' ? ($val ? e(t('yes')) : e(t('no'))) : e((string) $val) ?></td>
+            <td>
+              <?php if ($item['field_type'] === 'Boolean'): ?>
+                <?= $val ? e(t('yes')) : e(t('no')) ?>
+              <?php elseif ($item['field_type'] === 'Email' && $val): ?>
+                <a href="mailto:<?= e($val) ?>"><?= e($val) ?></a>
+              <?php else: ?>
+                <?= e((string) $val) ?>
+              <?php endif; ?>
+            </td>
           </tr>
         <?php else: $fkVal = $row[$item['fk_field']] ?? null; $parentEnt = get_entity((int) $item['parent_entity_id']); ?>
           <tr>
