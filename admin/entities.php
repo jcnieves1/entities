@@ -42,8 +42,6 @@ include __DIR__ . '/../includes/header.php';
               <a href="entity_edit.php?id=<?= (int) $ent['id'] ?>"><?= e(t('edit')) ?></a>
               &nbsp;|&nbsp;
               <a href="../entity.php?entity=<?= e($ent['name']) ?>"><?= e(t('view')) ?></a>
-              &nbsp;|&nbsp;
-              <a href="entity_delete.php?id=<?= (int) $ent['id'] ?>" style="color:var(--danger);"><?= e(t('delete_entity')) ?></a>
             </td>
           </tr>
         <?php endforeach; ?>
