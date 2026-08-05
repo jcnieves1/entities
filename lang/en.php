@@ -153,4 +153,25 @@ return [
 
     // Field type: Email
     'invalid_email_field' => '%s must be a valid email address.',
+
+    // Admin: edit / delete field
+    'edit_field' => 'Edit field',
+    'delete_field' => 'Delete field',
+    'field_updated' => 'Field updated.',
+    'field_deleted' => 'Field, its column and its data were permanently deleted.',
+    'target_entity' => 'Target entity',
+    'field_default_invalid_for_type' => 'The default value is not valid for type %s.',
+    'field_change_risk_title' => 'This change will alter or remove existing data.',
+    'field_change_risk_warning' => 'Applying this change will modify the real database column. Review exactly what will happen below before confirming.',
+    'field_change_invalid_rows' => 'Rows whose current value cannot be converted to the new type at all (they will be cleared): %s',
+    'field_change_truncate_rows' => 'Rows whose current value will be shortened or lose precision: %s',
+    'field_change_backfill_rows' => 'Empty rows that will be filled with the default value because the field is becoming required: %s',
+    'field_change_relink_rows' => 'Existing links that will be cleared because the target entity is changing: %s',
+    'field_change_duplicate_rows' => 'Groups of duplicate values that will be cleared (kept only on the earliest row) because this is becoming a one-to-one relationship: %s',
+    'confirm_data_loss_checkbox' => 'I understand this may alter or permanently remove existing data, and I want to proceed.',
+    'apply_changes' => 'Apply changes anyway',
+    'delete_field_warning_title' => 'This action is permanent and cannot be undone.',
+    'delete_field_warning_body' => 'Deleting this field will drop its column from the database table, permanently destroying the value stored in it for every row.',
+    'delete_field_relationship_note' => 'This is a relationship field: deleting it also removes the connection between the two entities (the related entity\'s own table and data are not affected).',
+    'delete_field_confirm_button' => 'Permanently delete this field',
 ];

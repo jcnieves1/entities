@@ -153,4 +153,25 @@ return [
 
     // Tipo de campo: Email
     'invalid_email_field' => '%s debe ser una dirección de correo electrónico válida.',
+
+    // Admin: editar / eliminar campo
+    'edit_field' => 'Editar campo',
+    'delete_field' => 'Eliminar campo',
+    'field_updated' => 'Campo actualizado.',
+    'field_deleted' => 'El campo, su columna y sus datos fueron eliminados permanentemente.',
+    'target_entity' => 'Entidad de destino',
+    'field_default_invalid_for_type' => 'El valor por defecto no es válido para el tipo %s.',
+    'field_change_risk_title' => 'Este cambio alterará o eliminará datos existentes.',
+    'field_change_risk_warning' => 'Aplicar este cambio modificará la columna real de la base de datos. Revisa exactamente qué sucederá antes de confirmar.',
+    'field_change_invalid_rows' => 'Filas cuyo valor actual no se puede convertir al nuevo tipo en absoluto (se vaciarán): %s',
+    'field_change_truncate_rows' => 'Filas cuyo valor actual se acortará o perderá precisión: %s',
+    'field_change_backfill_rows' => 'Filas vacías que se llenarán con el valor por defecto porque el campo pasará a ser obligatorio: %s',
+    'field_change_relink_rows' => 'Vínculos existentes que se eliminarán porque la entidad de destino está cambiando: %s',
+    'field_change_duplicate_rows' => 'Grupos de valores duplicados que se vaciarán (se conservará solo en la fila más antigua) porque esto pasará a ser una relación uno a uno: %s',
+    'confirm_data_loss_checkbox' => 'Entiendo que esto puede alterar o eliminar permanentemente datos existentes, y deseo continuar.',
+    'apply_changes' => 'Aplicar cambios de todas formas',
+    'delete_field_warning_title' => 'Esta acción es permanente y no se puede deshacer.',
+    'delete_field_warning_body' => 'Eliminar este campo borrará su columna en la tabla de la base de datos, destruyendo permanentemente el valor almacenado en él para cada fila.',
+    'delete_field_relationship_note' => 'Este es un campo de relación: eliminarlo también elimina la conexión entre las dos entidades (la tabla y los datos propios de la entidad relacionada no se ven afectados).',
+    'delete_field_confirm_button' => 'Eliminar este campo permanentemente',
 ];

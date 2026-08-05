@@ -228,7 +228,7 @@ include __DIR__ . '/../includes/header.php';
   <div class="card">
     <h3><?= e(t('fields')) ?></h3>
     <table class="data-table">
-      <thead><tr><th><?= e(t('field_name')) ?></th><th><?= e(t('field_label')) ?></th><th><?= e(t('field_type')) ?></th><th><?= e(t('max_length')) ?></th><th><?= e(t('default_value')) ?></th><th><?= e(t('required')) ?></th></tr></thead>
+      <thead><tr><th><?= e(t('field_name')) ?></th><th><?= e(t('field_label')) ?></th><th><?= e(t('field_type')) ?></th><th><?= e(t('max_length')) ?></th><th><?= e(t('default_value')) ?></th><th><?= e(t('required')) ?></th><th><?= e(t('actions')) ?></th></tr></thead>
       <tbody>
         <?php foreach (merge_display_fields(get_entity_fields($entity['id']), get_relationships_as_child($entity['id'])) as $item): ?>
           <?php if ($item['kind'] === 'field'): ?>
@@ -239,6 +239,10 @@ include __DIR__ . '/../includes/header.php';
               <td><?= e((string) $item['max_length']) ?></td>
               <td><?= e((string) $item['default_value']) ?></td>
               <td><?= $item['is_required'] ? e(t('yes')) : e(t('no')) ?></td>
+              <td>
+                <a class="btn btn-secondary btn-sm" href="field_edit.php?entity_id=<?= (int) $entity['id'] ?>&field_id=<?= (int) $item['id'] ?>"><?= e(t('edit')) ?></a>
+                <a class="btn btn-danger btn-sm" href="field_delete.php?entity_id=<?= (int) $entity['id'] ?>&field_id=<?= (int) $item['id'] ?>"><?= e(t('delete')) ?></a>
+              </td>
             </tr>
           <?php else: ?>
             <tr>
@@ -248,6 +252,10 @@ include __DIR__ . '/../includes/header.php';
               <td>&mdash;</td>
               <td>&mdash;</td>
               <td>&mdash;</td>
+              <td>
+                <a class="btn btn-secondary btn-sm" href="field_edit.php?entity_id=<?= (int) $entity['id'] ?>&rel_id=<?= (int) $item['id'] ?>"><?= e(t('edit')) ?></a>
+                <a class="btn btn-danger btn-sm" href="field_delete.php?entity_id=<?= (int) $entity['id'] ?>&rel_id=<?= (int) $item['id'] ?>"><?= e(t('delete')) ?></a>
+              </td>
             </tr>
           <?php endif; ?>
         <?php endforeach; ?>
