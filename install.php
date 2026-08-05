@@ -89,6 +89,25 @@ if (!$connError && !$alreadyInstalled && $_SERVER['REQUEST_METHOD'] === 'POST') 
             FOREIGN KEY (parent_entity_id) REFERENCES entities(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        $pdo->exec("CREATE TABLE field_conditions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            target_field_id INT NULL,
+            target_relationship_id INT NULL,
+            group_index INT NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            source_type ENUM('own_field','own_relationship','related_field') NOT NULL,
+            source_field_id INT NULL,
+            source_relationship_id INT NULL,
+            via_relationship_id INT NULL,
+            operator ENUM('equals','not_equals','greater_than','greater_or_equal','less_than','less_or_equal','contains','is_null','is_not_null') NOT NULL,
+            compare_value VARCHAR(255) DEFAULT NULL,
+            FOREIGN KEY (target_field_id) REFERENCES entity_fields(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE,
+            FOREIGN KEY (source_field_id) REFERENCES entity_fields(id) ON DELETE CASCADE,
+            FOREIGN KEY (source_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE,
+            FOREIGN KEY (via_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         $pdo->exec("CREATE TABLE role_permissions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             role_id INT NOT NULL,

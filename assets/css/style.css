@@ -211,6 +211,13 @@ table.data-table tr:hover td { background: var(--surface-2); }
 .field-row label { margin-bottom: 0; }
 .field-row .remove-field-btn { height: 36px; }
 
+.cond-group { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--surface-2); }
+.cond-or-label { font-weight: 700; font-size: 11px; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 8px; }
+.cond-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.cond-and-label { font-weight: 600; font-size: 11px; color: var(--text-muted); min-width: 24px; }
+.cond-source, .cond-operator { min-width: 160px; }
+.cond-value { min-width: 140px; }
+
 .perm-table td, .perm-table th { text-align: center; }
 .perm-table td:first-child, .perm-table th:first-child { text-align: left; }
 

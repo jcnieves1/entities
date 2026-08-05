@@ -241,6 +241,7 @@ include __DIR__ . '/../includes/header.php';
               <td><?= $item['is_required'] ? e(t('yes')) : e(t('no')) ?></td>
               <td>
                 <a class="btn btn-secondary btn-sm" href="field_edit.php?entity_id=<?= (int) $entity['id'] ?>&field_id=<?= (int) $item['id'] ?>"><?= e(t('edit')) ?></a>
+                <a class="btn btn-secondary btn-sm" href="field_conditions.php?entity_id=<?= (int) $entity['id'] ?>&field_id=<?= (int) $item['id'] ?>"><?= e(t('conditions')) ?><?php $cc = count(get_field_conditions((int) $item['id'], null)); ?><?= $cc ? ' (' . $cc . ')' : '' ?></a>
                 <a class="btn btn-danger btn-sm" href="field_delete.php?entity_id=<?= (int) $entity['id'] ?>&field_id=<?= (int) $item['id'] ?>"><?= e(t('delete')) ?></a>
               </td>
             </tr>
@@ -254,6 +255,7 @@ include __DIR__ . '/../includes/header.php';
               <td>&mdash;</td>
               <td>
                 <a class="btn btn-secondary btn-sm" href="field_edit.php?entity_id=<?= (int) $entity['id'] ?>&rel_id=<?= (int) $item['id'] ?>"><?= e(t('edit')) ?></a>
+                <a class="btn btn-secondary btn-sm" href="field_conditions.php?entity_id=<?= (int) $entity['id'] ?>&rel_id=<?= (int) $item['id'] ?>"><?= e(t('conditions')) ?><?php $cc = count(get_field_conditions(null, (int) $item['id'])); ?><?= $cc ? ' (' . $cc . ')' : '' ?></a>
                 <a class="btn btn-danger btn-sm" href="field_delete.php?entity_id=<?= (int) $entity['id'] ?>&rel_id=<?= (int) $item['id'] ?>"><?= e(t('delete')) ?></a>
               </td>
             </tr>

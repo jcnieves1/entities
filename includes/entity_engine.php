@@ -15,6 +15,12 @@ require_once __DIR__ . '/functions.php';
 
 const ENTITY_TABLE_PREFIX = 'ent_';
 
+// Operators available when building "enable this field if..." conditions.
+const CONDITION_OPERATORS = [
+    'equals', 'not_equals', 'greater_than', 'greater_or_equal',
+    'less_than', 'less_or_equal', 'contains', 'is_null', 'is_not_null',
+];
+
 /**
  * Thrown by update_field()/update_relationship() when applying the
  * requested change would alter or destroy existing row data and the caller
@@ -930,6 +936,408 @@ function delete_entity(int $entityId): void
     //    role_permissions rows that reference this entity.
     $stmt = $pdo->prepare('DELETE FROM entities WHERE id = ?');
     $stmt->execute([$entityId]);
+}
+
+// ---------------------------------------------------------------------
+// Field-enable conditions ("enable this field only if...")
+// ---------------------------------------------------------------------
+
+/**
+ * Parse a source-selector string built by admin/field_conditions.php's form
+ * into [source_type, source_field_id, source_relationship_id, via_relationship_id].
+ * Formats: "own_field:<field_id>", "own_relationship:<rel_id>",
+ * "related_field:<via_rel_id>:<field_id>".
+ */
+function parse_condition_source(string $source): array
+{
+    $parts = explode(':', $source);
+    if (($parts[0] ?? '') === 'own_field' && isset($parts[1])) {
+        return ['own_field', (int) $parts[1], null, null];
+    }
+    if (($parts[0] ?? '') === 'own_relationship' && isset($parts[1])) {
+        return ['own_relationship', null, (int) $parts[1], null];
+    }
+    if (($parts[0] ?? '') === 'related_field' && isset($parts[1], $parts[2])) {
+        return ['related_field', (int) $parts[2], null, (int) $parts[1]];
+    }
+    return [null, null, null, null];
+}
+
+/**
+ * All possible condition sources for building the admin UI's source dropdown:
+ * this entity's own fields, this entity's own relationships (their FK value),
+ * and - one hop out - the fields of each entity this one has a relationship
+ * to. Optionally excludes one field/relationship (the condition's own target,
+ * so a field can't be made to depend on itself).
+ */
+function get_condition_source_options(array $entity, ?int $excludeFieldId = null, ?int $excludeRelId = null): array
+{
+    $options = ['own_fields' => [], 'own_relationships' => [], 'related' => []];
+
+    foreach (get_entity_fields($entity['id']) as $f) {
+        if ((int) $f['id'] === $excludeFieldId) {
+            continue;
+        }
+        $options['own_fields'][] = ['value' => 'own_field:' . $f['id'], 'label' => $f['label'], 'field_type' => $f['field_type']];
+    }
+
+    foreach (get_relationships_as_child($entity['id']) as $r) {
+        if ((int) $r['id'] !== $excludeRelId) {
+            $options['own_relationships'][] = ['value' => 'own_relationship:' . $r['id'], 'label' => $r['label'] ?: $r['parent_label']];
+        }
+        $parent = get_entity((int) $r['parent_entity_id']);
+        if (!$parent) {
+            continue;
+        }
+        $group = [];
+        foreach (get_entity_fields($parent['id']) as $pf) {
+            $group[] = ['value' => 'related_field:' . $r['id'] . ':' . $pf['id'], 'label' => $pf['label'], 'field_type' => $pf['field_type']];
+        }
+        if ($group) {
+            $options['related'][] = ['relationship_label' => ($r['label'] ?: $r['parent_label']), 'fields' => $group];
+        }
+    }
+
+    return $options;
+}
+
+/** Enrich a raw field_conditions row with human labels and the actual column names needed to evaluate it. */
+function enrich_condition_row(array $r): array
+{
+    $out = [
+        'id' => (int) $r['id'],
+        'source_type' => $r['source_type'],
+        'operator' => $r['operator'],
+        'compare_value' => $r['compare_value'],
+        'source_field_name' => null,
+        'source_fk_field' => null,
+        'via_fk_field' => null,
+        'via_relationship_id' => $r['via_relationship_id'] !== null ? (int) $r['via_relationship_id'] : null,
+        'field_type' => 'String',
+        'label' => '',
+        // Reconstructed "own_field:ID" / "own_relationship:ID" / "related_field:RELID:FIELDID"
+        // selector string, matching parse_condition_source() - used to pre-select the admin UI's dropdown.
+        'source_value' => '',
+    ];
+
+    if ($r['source_type'] === 'own_field') {
+        $f = get_field((int) $r['source_field_id']);
+        if ($f) {
+            $out['source_field_name'] = $f['name'];
+            $out['field_type'] = $f['field_type'];
+            $out['label'] = $f['label'];
+        }
+        $out['source_value'] = 'own_field:' . (int) $r['source_field_id'];
+    } elseif ($r['source_type'] === 'own_relationship') {
+        $rel = get_relationship((int) $r['source_relationship_id']);
+        if ($rel) {
+            $out['source_fk_field'] = $rel['fk_field'];
+            $out['field_type'] = 'Int';
+            $out['label'] = $rel['label'] ?: $rel['parent_label'];
+        }
+        $out['source_value'] = 'own_relationship:' . (int) $r['source_relationship_id'];
+    } elseif ($r['source_type'] === 'related_field') {
+        $via = get_relationship((int) $r['via_relationship_id']);
+        $f = get_field((int) $r['source_field_id']);
+        if ($via) {
+            $out['via_fk_field'] = $via['fk_field'];
+        }
+        if ($f) {
+            $out['source_field_name'] = $f['name'];
+            $out['field_type'] = $f['field_type'];
+            $out['label'] = ($via ? (($via['label'] ?: $via['parent_label']) . ': ') : '') . $f['label'];
+        }
+        $out['source_value'] = 'related_field:' . (int) $r['via_relationship_id'] . ':' . (int) $r['source_field_id'];
+    }
+
+    return $out;
+}
+
+/**
+ * A target's condition tree: a list of OR-groups, each an ordered list of
+ * AND-conditions - i.e. "(c1 AND c2) OR (c3)". An empty list means the field
+ * has no conditions defined and is always enabled.
+ */
+function get_field_conditions(?int $targetFieldId, ?int $targetRelationshipId): array
+{
+    $pdo = db();
+    if ($targetFieldId) {
+        $stmt = $pdo->prepare('SELECT * FROM field_conditions WHERE target_field_id = ? ORDER BY group_index ASC, sort_order ASC, id ASC');
+        $stmt->execute([$targetFieldId]);
+    } elseif ($targetRelationshipId) {
+        $stmt = $pdo->prepare('SELECT * FROM field_conditions WHERE target_relationship_id = ? ORDER BY group_index ASC, sort_order ASC, id ASC');
+        $stmt->execute([$targetRelationshipId]);
+    } else {
+        return [];
+    }
+
+    $groups = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $groups[(int) $r['group_index']][] = enrich_condition_row($r);
+    }
+    ksort($groups);
+    return array_values($groups);
+}
+
+/**
+ * Replace the entire condition tree for one target (field or relationship)
+ * with $groups, built from the admin form's nested groups[G][C][source|operator|value]
+ * arrays. Empty conditions/groups are dropped silently.
+ */
+function save_field_conditions(?int $targetFieldId, ?int $targetRelationshipId, array $groups): void
+{
+    $pdo = db();
+    if ($targetFieldId) {
+        $del = $pdo->prepare('DELETE FROM field_conditions WHERE target_field_id = ?');
+        $del->execute([$targetFieldId]);
+    } elseif ($targetRelationshipId) {
+        $del = $pdo->prepare('DELETE FROM field_conditions WHERE target_relationship_id = ?');
+        $del->execute([$targetRelationshipId]);
+    } else {
+        return;
+    }
+
+    $insert = $pdo->prepare('INSERT INTO field_conditions
+        (target_field_id, target_relationship_id, group_index, sort_order, source_type, source_field_id, source_relationship_id, via_relationship_id, operator, compare_value)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+
+    $groupIndex = 0;
+    foreach ($groups as $group) {
+        if (!is_array($group)) {
+            continue;
+        }
+        $sortOrder = 0;
+        $wroteAny = false;
+        foreach ($group as $cond) {
+            $source = trim($cond['source'] ?? '');
+            $operator = $cond['operator'] ?? '';
+            $value = $cond['value'] ?? null;
+            if ($source === '' || !in_array($operator, CONDITION_OPERATORS, true)) {
+                continue;
+            }
+            [$sourceType, $sourceFieldId, $sourceRelationshipId, $viaRelationshipId] = parse_condition_source($source);
+            if (!$sourceType) {
+                continue;
+            }
+            $insert->execute([
+                $targetFieldId, $targetRelationshipId, $groupIndex, $sortOrder,
+                $sourceType, $sourceFieldId, $sourceRelationshipId, $viaRelationshipId,
+                $operator, ($value === '' || $value === null ? null : $value),
+            ]);
+            $sortOrder++;
+            $wroteAny = true;
+        }
+        if ($wroteAny) {
+            $groupIndex++;
+        }
+    }
+}
+
+/** Preload {row_id: {field_name: value}} for a related entity, for the fields conditions actually need. */
+function get_related_field_lookup(int $relationshipId, array $fieldNames): array
+{
+    $fieldNames = array_values(array_unique(array_filter($fieldNames)));
+    if (!$fieldNames) {
+        return [];
+    }
+    $rel = get_relationship($relationshipId);
+    if (!$rel) {
+        return [];
+    }
+    $cols = array_unique(array_merge(['id'], $fieldNames));
+    $colsSql = implode(', ', array_map(function ($c) { return '`' . sanitize_identifier($c) . '`'; }, $cols));
+    $stmt = db()->query("SELECT $colsSql FROM `{$rel['parent_table']}` LIMIT 1000");
+    $out = [];
+    foreach ($stmt as $row) {
+        $out[$row['id']] = $row;
+    }
+    return $out;
+}
+
+/**
+ * Gather everything needed to enable/disable $displayFields on a form:
+ * ['targets' => ['field:<name>' | 'rel:<fk_field>' => groups, ...],
+ *  'related_lookups' => ['<fk_field>' => [row_id => [field_name => value]]]].
+ * Only fields/relationships that actually have conditions appear in 'targets'.
+ */
+function build_condition_context(array $displayFields): array
+{
+    $targets = [];
+    $neededByRel = [];
+
+    foreach ($displayFields as $item) {
+        $targetFieldId = $item['kind'] === 'field' ? (int) $item['id'] : null;
+        $targetRelId = $item['kind'] === 'relationship' ? (int) $item['id'] : null;
+        $groups = get_field_conditions($targetFieldId, $targetRelId);
+        if (!$groups) {
+            continue;
+        }
+        $key = $item['kind'] === 'field' ? ('field:' . $item['name']) : ('rel:' . $item['fk_field']);
+        $targets[$key] = $groups;
+        foreach ($groups as $group) {
+            foreach ($group as $cond) {
+                if ($cond['source_type'] === 'related_field' && $cond['via_relationship_id'] && $cond['source_field_name']) {
+                    $neededByRel[$cond['via_relationship_id']][] = $cond['source_field_name'];
+                }
+            }
+        }
+    }
+
+    $relatedLookups = [];
+    foreach ($neededByRel as $relId => $fieldNames) {
+        $rel = get_relationship((int) $relId);
+        if (!$rel) {
+            continue;
+        }
+        $relatedLookups[$rel['fk_field']] = get_related_field_lookup((int) $relId, $fieldNames);
+    }
+
+    return ['targets' => $targets, 'related_lookups' => $relatedLookups];
+}
+
+/**
+ * Resolve a single condition's left-hand value from $row (a merged
+ * name=>value array covering both native columns and FK columns - exactly
+ * what entity_get_row() returns, or $data + $fkValues on a fresh submission)
+ * and, for related_field conditions, $relatedLookups (see build_condition_context()).
+ */
+function resolve_condition_value(array $cond, array $row, array $relatedLookups)
+{
+    if ($cond['source_type'] === 'own_field') {
+        return $cond['source_field_name'] !== null ? ($row[$cond['source_field_name']] ?? null) : null;
+    }
+    if ($cond['source_type'] === 'own_relationship') {
+        return $cond['source_fk_field'] !== null ? ($row[$cond['source_fk_field']] ?? null) : null;
+    }
+    if ($cond['source_type'] === 'related_field' && $cond['via_fk_field'] !== null) {
+        $parentId = $row[$cond['via_fk_field']] ?? null;
+        if (!$parentId) {
+            return null;
+        }
+        $prow = $relatedLookups[$cond['via_fk_field']][$parentId] ?? null;
+        return $prow[$cond['source_field_name']] ?? null;
+    }
+    return null;
+}
+
+/**
+ * True if $value satisfies $operator/$compareValue. Empty/null values only
+ * ever satisfy is_null/is_not_null - every other operator treats an empty
+ * left-hand side as "doesn't match". Numeric-looking values are compared
+ * numerically; Date-typed values are compared as dates; everything else
+ * falls back to a case-insensitive string comparison. Mirrored in
+ * assets/js/app.js's EntityConditions.passes() for live client-side toggling.
+ */
+function evaluate_condition($value, string $operator, ?string $compareValue, string $fieldType = 'String'): bool
+{
+    $isEmpty = ($value === null || $value === '');
+    if ($operator === 'is_null') {
+        return $isEmpty;
+    }
+    if ($operator === 'is_not_null') {
+        return !$isEmpty;
+    }
+    if ($isEmpty || $compareValue === null || $compareValue === '') {
+        return false;
+    }
+
+    if ($fieldType === 'Date') {
+        $a = strtotime((string) $value);
+        $b = strtotime((string) $compareValue);
+        if ($a !== false && $b !== false) {
+            switch ($operator) {
+                case 'equals': return $a === $b;
+                case 'not_equals': return $a !== $b;
+                case 'greater_than': return $a > $b;
+                case 'greater_or_equal': return $a >= $b;
+                case 'less_than': return $a < $b;
+                case 'less_or_equal': return $a <= $b;
+                case 'contains': return false;
+            }
+        }
+    }
+
+    $bothNumeric = is_numeric($value) && is_numeric($compareValue);
+    switch ($operator) {
+        case 'equals':
+            return $bothNumeric ? ((float) $value == (float) $compareValue) : (strtolower((string) $value) === strtolower((string) $compareValue));
+        case 'not_equals':
+            return $bothNumeric ? ((float) $value != (float) $compareValue) : (strtolower((string) $value) !== strtolower((string) $compareValue));
+        case 'greater_than':
+            return $bothNumeric && (float) $value > (float) $compareValue;
+        case 'greater_or_equal':
+            return $bothNumeric && (float) $value >= (float) $compareValue;
+        case 'less_than':
+            return $bothNumeric && (float) $value < (float) $compareValue;
+        case 'less_or_equal':
+            return $bothNumeric && (float) $value <= (float) $compareValue;
+        case 'contains':
+            return stripos((string) $value, (string) $compareValue) !== false;
+        default:
+            return false;
+    }
+}
+
+/** Evaluate a full OR-of-ANDs condition tree. No groups at all => always enabled. */
+function conditions_pass(array $groups, callable $resolver): bool
+{
+    if (!$groups) {
+        return true;
+    }
+    foreach ($groups as $group) {
+        $allPass = true;
+        foreach ($group as $cond) {
+            $value = $resolver($cond);
+            if (!evaluate_condition($value, $cond['operator'], $cond['compare_value'], $cond['field_type'])) {
+                $allPass = false;
+                break;
+            }
+        }
+        if ($allPass) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Convenience wrapper: is this target's condition tree satisfied by $row? */
+function field_is_enabled(array $groups, array $row, array $relatedLookups): bool
+{
+    return conditions_pass($groups, function ($cond) use ($row, $relatedLookups) {
+        return resolve_condition_value($cond, $row, $relatedLookups);
+    });
+}
+
+/** Shrink build_condition_context()'s output down to what the browser needs (see assets/js/app.js). */
+function build_js_conditions_payload(array $ctx): array
+{
+    $targets = [];
+    foreach ($ctx['targets'] as $key => $groups) {
+        $jsGroups = [];
+        foreach ($groups as $group) {
+            $jsConds = [];
+            foreach ($group as $cond) {
+                if ($cond['source_type'] === 'own_field') {
+                    $inputName = $cond['source_field_name'];
+                } elseif ($cond['source_type'] === 'own_relationship') {
+                    $inputName = $cond['source_fk_field'];
+                } else {
+                    $inputName = $cond['via_fk_field'];
+                }
+                $jsConds[] = [
+                    'source_type' => $cond['source_type'],
+                    'input_name' => $inputName,
+                    'related_field_name' => $cond['source_type'] === 'related_field' ? $cond['source_field_name'] : null,
+                    'operator' => $cond['operator'],
+                    'compare_value' => $cond['compare_value'],
+                    'field_type' => $cond['field_type'],
+                ];
+            }
+            $jsGroups[] = $jsConds;
+        }
+        $targets[] = ['key' => $key, 'groups' => $jsGroups];
+    }
+    return ['targets' => $targets, 'relatedLookups' => $ctx['related_lookups']];
 }
 
 /** All rows of an entity as id => display-label pairs, for building FK <select> dropdowns. */

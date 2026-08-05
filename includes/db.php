@@ -61,4 +61,30 @@ function run_migrations(): void
     if ($columnType !== '' && strpos($columnType, "'Email'") === false) {
         $pdo->exec("ALTER TABLE entity_fields MODIFY COLUMN field_type ENUM('Int','String','Date','Boolean','Float','Email') NOT NULL");
     }
+
+    // field_conditions: whole table added later, for the "enable this field
+    // only if..." feature. Create it if this install predates that feature.
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'field_conditions'");
+    $stmt->execute();
+    if (!$stmt->fetchColumn()) {
+        $pdo->exec("CREATE TABLE field_conditions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            target_field_id INT NULL,
+            target_relationship_id INT NULL,
+            group_index INT NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            source_type ENUM('own_field','own_relationship','related_field') NOT NULL,
+            source_field_id INT NULL,
+            source_relationship_id INT NULL,
+            via_relationship_id INT NULL,
+            operator ENUM('equals','not_equals','greater_than','greater_or_equal','less_than','less_or_equal','contains','is_null','is_not_null') NOT NULL,
+            compare_value VARCHAR(255) DEFAULT NULL,
+            FOREIGN KEY (target_field_id) REFERENCES entity_fields(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE,
+            FOREIGN KEY (source_field_id) REFERENCES entity_fields(id) ON DELETE CASCADE,
+            FOREIGN KEY (source_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE,
+            FOREIGN KEY (via_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
 }

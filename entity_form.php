@@ -31,6 +31,7 @@ if (!$isEdit && !has_permission($entity['id'], 'create')) {
 $fields = get_entity_fields($entity['id']);
 $parentRelationships = get_relationships_as_child($entity['id']); // FK columns this entity holds
 $displayFields = merge_display_fields($fields, $parentRelationships); // both, in the admin's defined order
+$conditionCtx = build_condition_context($displayFields); // "enable this field only if..." rules, if any are defined
 
 $row = $isEdit ? entity_get_row($entity, $id) : [];
 if ($isEdit && !$row) {
@@ -59,16 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data[$f['name']] = trim($data[$f['name']]);
         }
     }
-    // Required-field validation
-    foreach ($fields as $f) {
-        if ($f['is_required'] && ($data[$f['name']] === null || $data[$f['name']] === '')) {
-            $error = $f['label'] . ' is required.';
-        }
-        if ($f['field_type'] === 'Email' && !empty($data[$f['name']]) && !is_valid_email($data[$f['name']])) {
-            $error = sprintf(t('invalid_email_field'), $f['label']);
-        }
-    }
-
     $fkValues = [];
     foreach ($parentRelationships as $rel) {
         $col = $rel['fk_field'];
@@ -76,6 +67,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fkValues[$col] = $parentId;
         } else {
             $fkValues[$col] = $_POST['fk'][$col] ?? null;
+        }
+    }
+
+    // Re-derive which fields are actually enabled from what was just
+    // submitted - never trust the client-side hide/show alone. Anything that
+    // evaluates to disabled gets its submitted value discarded (nulled) and
+    // is exempt from the required check below.
+    $submittedRow = array_merge($data, $fkValues);
+    $disabledKeys = [];
+    foreach ($displayFields as $item) {
+        $key = $item['kind'] === 'field' ? ('field:' . $item['name']) : ('rel:' . $item['fk_field']);
+        if (!isset($conditionCtx['targets'][$key])) {
+            continue;
+        }
+        if (!field_is_enabled($conditionCtx['targets'][$key], $submittedRow, $conditionCtx['related_lookups'])) {
+            $disabledKeys[$key] = true;
+            if ($item['kind'] === 'field') {
+                $data[$item['name']] = null;
+            } else {
+                $fkValues[$item['fk_field']] = null;
+            }
+        }
+    }
+
+    // Required-field validation
+    foreach ($fields as $f) {
+        if (isset($disabledKeys['field:' . $f['name']])) {
+            continue;
+        }
+        if ($f['is_required'] && ($data[$f['name']] === null || $data[$f['name']] === '')) {
+            $error = $f['label'] . ' is required.';
+        }
+        if ($f['field_type'] === 'Email' && !empty($data[$f['name']]) && !is_valid_email($data[$f['name']])) {
+            $error = sprintf(t('invalid_email_field'), $f['label']);
         }
     }
 
@@ -93,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         redirect('entity_view.php?entity=' . urlencode($entity['name']) . '&id=' . $id . $backQs);
     }
-    $row = $data; // re-populate the form with submitted values on error
+    $row = array_merge($data, $fkValues); // re-populate the form (incl. FK selections) with submitted values on error
 }
 
 $pageTitle = ($isEdit ? t('edit_row') : t('add_row')) . ' — ' . $entity['label'];
@@ -104,7 +129,7 @@ include __DIR__ . '/includes/header.php';
 <?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
 <div class="card">
-  <form method="post">
+  <form method="post" data-conditional-form>
     <?= csrf_field() ?>
     <input type="hidden" name="entity" value="<?= e($entity['name']) ?>">
     <input type="hidden" name="action" value="<?= $isEdit ? 'edit' : 'create' ?>">
@@ -115,7 +140,12 @@ include __DIR__ . '/includes/header.php';
       <input type="hidden" name="parent_entity" value="<?= e($parentEntityName) ?>">
     <?php endif; ?>
 
-    <?php foreach ($displayFields as $item): ?>
+    <?php foreach ($displayFields as $item):
+      $condKey = $item['kind'] === 'field' ? ('field:' . $item['name']) : ('rel:' . $item['fk_field']);
+      $condGroups = $conditionCtx['targets'][$condKey] ?? null;
+      $condEnabled = $condGroups ? field_is_enabled($condGroups, $row, $conditionCtx['related_lookups']) : true;
+    ?>
+      <div data-cond-target="<?= e($condKey) ?>" <?= $condGroups && !$condEnabled ? 'style="display:none"' : '' ?>>
       <?php if ($item['kind'] === 'field'): $f = $item; $val = $row[$f['name']] ?? $f['default_value']; ?>
         <label>
           <?= e($f['label']) ?><?= $f['is_required'] ? ' *' : '' ?>
@@ -150,6 +180,7 @@ include __DIR__ . '/includes/header.php';
           </label>
         <?php endif; ?>
       <?php endif; ?>
+      </div>
     <?php endforeach; ?>
 
     <div class="form-actions">
@@ -158,5 +189,13 @@ include __DIR__ . '/includes/header.php';
     </div>
   </form>
 </div>
+
+<?php if ($conditionCtx['targets']): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  window.EntityConditions.init(<?= json_encode(build_js_conditions_payload($conditionCtx)) ?>);
+});
+</script>
+<?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
