@@ -226,6 +226,14 @@ table.data-table tr:hover td { background: var(--surface-2); }
 .tabs a { padding: 8px 14px; border-bottom: 2px solid transparent; color: var(--text-muted); font-size: 14px; }
 .tabs a.active { color: var(--primary); border-color: var(--primary); }
 
+.filters-card { padding-bottom: 10px; }
+.filters-form { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; }
+.filter-field { margin-bottom: 0; min-width: 160px; flex: 1 1 160px; }
+.filter-date-group { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px 10px; margin: 0; display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 320px; }
+.filter-date-group legend { font-size: 12px; color: var(--text-muted); padding: 0 4px; }
+.filter-subfield { margin-bottom: 0; font-size: 12px; flex: 1 1 90px; }
+.filter-actions { display: flex; gap: 8px; margin-left: auto; }
+
 .form-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 .text-muted { color: var(--text-muted); font-size: 13px; }
 .inline-form { display: inline; }
@@ -300,6 +308,10 @@ table.data-table tr:hover td { background: var(--surface-2); }
   .field-row { grid-template-columns: 1fr; }
   .cond-row { flex-direction: column; align-items: stretch; }
   .cond-source, .cond-operator, .cond-value { min-width: 0; width: 100%; }
+
+  .filters-form { flex-direction: column; align-items: stretch; }
+  .filter-field, .filter-date-group { min-width: 0; width: 100%; }
+  .filter-actions { margin-left: 0; }
 
   table.data-table th, table.data-table td { padding: 8px; font-size: 13px; white-space: nowrap; }
 }

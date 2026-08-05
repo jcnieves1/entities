@@ -118,6 +118,17 @@ return [
 
     // Entity CRUD
     'no_rows' => 'No rows yet.',
+    'no_rows_filtered' => 'No rows match your filters.',
+    'filters' => 'Filters',
+    'apply_filters' => 'Apply filters',
+    'clear_filters' => 'Clear filters',
+    'filter_any' => 'Any',
+    'filter_yes' => 'Yes',
+    'filter_no' => 'No',
+    'filter_on_date' => 'On',
+    'filter_from_date' => 'From',
+    'filter_to_date' => 'To',
+    'filter_contains_placeholder' => 'Contains...',
     'add_row' => 'Add new',
     'edit_row' => 'Edit',
     'view_row' => 'View',

@@ -763,7 +763,62 @@ function sql_default_for(array $field)
     }
 }
 
-function entity_list_rows(array $entity, array $fields, array $filters = [], int $page = 1, int $perPage = ROWS_PER_PAGE): array
+/**
+ * Turn the list view's ?f_<field>=... query params into structured filter
+ * specs for entity_list_rows()'s $advancedFilters. Recognizes, per field:
+ *   - String/Email:      f_<name>            -> substring match (LIKE)
+ *   - Int/Float:         f_<name>            -> exact match
+ *   - Boolean:           f_<name>            -> '1'/'0' exact match
+ *   - Date:              f_<name>            -> exact date
+ *                         f_<name>_from/_to  -> date range (either or both)
+ *   - Relationship (FK): f_<fk_field>        -> exact row id
+ */
+function build_entity_filters_from_request(array $displayFields, array $params): array
+{
+    $filters = [];
+    foreach ($displayFields as $item) {
+        if ($item['kind'] === 'field') {
+            $name = $item['name'];
+            $key = 'f_' . $name;
+            switch ($item['field_type']) {
+                case 'Date':
+                    if (!empty($params[$key])) {
+                        $filters[] = ['column' => $name, 'op' => 'eq', 'value' => $params[$key]];
+                    }
+                    if (!empty($params[$key . '_from'])) {
+                        $filters[] = ['column' => $name, 'op' => 'gte', 'value' => $params[$key . '_from']];
+                    }
+                    if (!empty($params[$key . '_to'])) {
+                        $filters[] = ['column' => $name, 'op' => 'lte', 'value' => $params[$key . '_to']];
+                    }
+                    break;
+                case 'Boolean':
+                    if (isset($params[$key]) && $params[$key] !== '') {
+                        $filters[] = ['column' => $name, 'op' => 'eq', 'value' => $params[$key] === '1' ? 1 : 0];
+                    }
+                    break;
+                case 'Int':
+                case 'Float':
+                    if (isset($params[$key]) && $params[$key] !== '') {
+                        $filters[] = ['column' => $name, 'op' => 'eq', 'value' => $params[$key]];
+                    }
+                    break;
+                default: // String, Email
+                    if (isset($params[$key]) && $params[$key] !== '') {
+                        $filters[] = ['column' => $name, 'op' => 'like', 'value' => $params[$key]];
+                    }
+            }
+        } else {
+            $key = 'f_' . $item['fk_field'];
+            if (isset($params[$key]) && $params[$key] !== '') {
+                $filters[] = ['column' => $item['fk_field'], 'op' => 'eq', 'value' => (int) $params[$key]];
+            }
+        }
+    }
+    return $filters;
+}
+
+function entity_list_rows(array $entity, array $fields, array $filters = [], int $page = 1, int $perPage = ROWS_PER_PAGE, array $advancedFilters = []): array
 {
     $table = $entity['table_name'];
     $where = [];
@@ -771,6 +826,27 @@ function entity_list_rows(array $entity, array $fields, array $filters = [], int
     foreach ($filters as $col => $val) {
         $where[] = "`" . sanitize_identifier($col) . "` = ?";
         $params[] = $val;
+    }
+    foreach ($advancedFilters as $f) {
+        $col = sanitize_identifier($f['column']);
+        switch ($f['op']) {
+            case 'like':
+                $where[] = "`$col` LIKE ?";
+                $params[] = '%' . $f['value'] . '%';
+                break;
+            case 'gte':
+                $where[] = "`$col` >= ?";
+                $params[] = $f['value'];
+                break;
+            case 'lte':
+                $where[] = "`$col` <= ?";
+                $params[] = $f['value'];
+                break;
+            case 'eq':
+            default:
+                $where[] = "`$col` = ?";
+                $params[] = $f['value'];
+        }
     }
     $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 

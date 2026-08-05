@@ -118,6 +118,17 @@ return [
 
     // Entity CRUD
     'no_rows' => 'Aún no hay filas.',
+    'no_rows_filtered' => 'Ninguna fila coincide con tus filtros.',
+    'filters' => 'Filtros',
+    'apply_filters' => 'Aplicar filtros',
+    'clear_filters' => 'Quitar filtros',
+    'filter_any' => 'Cualquiera',
+    'filter_yes' => 'Sí',
+    'filter_no' => 'No',
+    'filter_on_date' => 'En',
+    'filter_from_date' => 'Desde',
+    'filter_to_date' => 'Hasta',
+    'filter_contains_placeholder' => 'Contiene...',
     'add_row' => 'Agregar nuevo',
     'edit_row' => 'Editar',
     'view_row' => 'Ver',

@@ -37,8 +37,10 @@ if ($parentField && $parentId) {
     }
 }
 
+$advancedFilters = build_entity_filters_from_request($displayFields, $_GET);
+
 $page = max(1, (int) ($_GET['page'] ?? 1));
-$result = entity_list_rows($entity, $fields, $filters, $page, ROWS_PER_PAGE);
+$result = entity_list_rows($entity, $fields, $filters, $page, ROWS_PER_PAGE, $advancedFilters);
 $totalPages = max(1, (int) ceil($result['total'] / ROWS_PER_PAGE));
 
 $canCreate = has_permission($entity['id'], 'create');
@@ -55,7 +57,30 @@ function extra_qs($parentField, $parentId, $parentEntityName) {
     }
     return $qs;
 }
-$qs = extra_qs($parentField, $parentId, $parentEntityName);
+
+/** Query-string fragment for every currently-set f_* filter param, so pagination/row links keep them applied. */
+function filter_qs(array $displayFields): string
+{
+    $qs = '';
+    foreach ($displayFields as $item) {
+        if ($item['kind'] === 'field' && $item['field_type'] === 'Date') {
+            $keys = ['f_' . $item['name'], 'f_' . $item['name'] . '_from', 'f_' . $item['name'] . '_to'];
+        } elseif ($item['kind'] === 'field') {
+            $keys = ['f_' . $item['name']];
+        } else {
+            $keys = ['f_' . $item['fk_field']];
+        }
+        foreach ($keys as $k) {
+            if (isset($_GET[$k]) && $_GET[$k] !== '') {
+                $qs .= '&' . $k . '=' . urlencode($_GET[$k]);
+            }
+        }
+    }
+    return $qs;
+}
+
+$qs = extra_qs($parentField, $parentId, $parentEntityName) . filter_qs($displayFields);
+$hasActiveFilters = (bool) $advancedFilters;
 ?>
 <div class="page-header">
   <h1><?= e($entity['label']) ?></h1>
@@ -67,9 +92,75 @@ $qs = extra_qs($parentField, $parentId, $parentEntityName);
   </div>
 </div>
 
+<?php if ($displayFields): ?>
+<div class="card filters-card">
+  <form method="get" class="filters-form">
+    <input type="hidden" name="entity" value="<?= e($entity['name']) ?>">
+    <?php if ($parentField): ?>
+      <input type="hidden" name="parent_field" value="<?= e($parentField) ?>">
+      <input type="hidden" name="parent_id" value="<?= (int) $parentId ?>">
+      <input type="hidden" name="parent_entity" value="<?= e($parentEntityName) ?>">
+    <?php endif; ?>
+
+    <?php foreach ($displayFields as $item): ?>
+      <?php if ($item['kind'] === 'field'):
+        $f = $item;
+        $key = 'f_' . $f['name'];
+        $current = $_GET[$key] ?? '';
+      ?>
+        <?php if ($f['field_type'] === 'Boolean'): ?>
+          <label class="filter-field"><?= e($f['label']) ?>
+            <select name="<?= e($key) ?>">
+              <option value=""><?= e(t('filter_any')) ?></option>
+              <option value="1" <?= $current === '1' ? 'selected' : '' ?>><?= e(t('filter_yes')) ?></option>
+              <option value="0" <?= $current === '0' ? 'selected' : '' ?>><?= e(t('filter_no')) ?></option>
+            </select>
+          </label>
+        <?php elseif ($f['field_type'] === 'Date'): ?>
+          <fieldset class="filter-field filter-date-group">
+            <legend><?= e($f['label']) ?></legend>
+            <label class="filter-subfield"><?= e(t('filter_on_date')) ?><input type="date" name="<?= e($key) ?>" value="<?= e((string) $current) ?>"></label>
+            <label class="filter-subfield"><?= e(t('filter_from_date')) ?><input type="date" name="<?= e($key) ?>_from" value="<?= e((string) ($_GET[$key . '_from'] ?? '')) ?>"></label>
+            <label class="filter-subfield"><?= e(t('filter_to_date')) ?><input type="date" name="<?= e($key) ?>_to" value="<?= e((string) ($_GET[$key . '_to'] ?? '')) ?>"></label>
+          </fieldset>
+        <?php elseif ($f['field_type'] === 'Int' || $f['field_type'] === 'Float'): ?>
+          <label class="filter-field"><?= e($f['label']) ?>
+            <input type="number" <?= $f['field_type'] === 'Float' ? 'step="any"' : 'step="1"' ?> name="<?= e($key) ?>" value="<?= e((string) $current) ?>">
+          </label>
+        <?php else: ?>
+          <label class="filter-field"><?= e($f['label']) ?>
+            <input type="text" name="<?= e($key) ?>" value="<?= e((string) $current) ?>" placeholder="<?= e(t('filter_contains_placeholder')) ?>">
+          </label>
+        <?php endif; ?>
+      <?php else:
+        $rel = $item;
+        $key = 'f_' . $rel['fk_field'];
+        $current = $_GET[$key] ?? '';
+        $relParentEnt = get_entity((int) $rel['parent_entity_id']);
+        $relOptions = get_entity_options($relParentEnt);
+      ?>
+        <label class="filter-field"><?= e($rel['label'] ?: $rel['parent_label']) ?>
+          <select name="<?= e($key) ?>">
+            <option value=""><?= e(t('filter_any')) ?></option>
+            <?php foreach ($relOptions as $oid => $label): ?>
+              <option value="<?= (int) $oid ?>" <?= (string) $current === (string) $oid ? 'selected' : '' ?>><?= e($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      <?php endif; ?>
+    <?php endforeach; ?>
+
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary btn-sm"><?= e(t('apply_filters')) ?></button>
+      <?php if ($hasActiveFilters): ?><a class="btn btn-secondary btn-sm" href="entity.php?entity=<?= e($entity['name']) ?><?= e(extra_qs($parentField, $parentId, $parentEntityName)) ?>"><?= e(t('clear_filters')) ?></a><?php endif; ?>
+    </div>
+  </form>
+</div>
+<?php endif; ?>
+
 <div class="card">
   <?php if (!$result['rows']): ?>
-    <p class="text-muted"><?= e(t('no_rows')) ?></p>
+    <p class="text-muted"><?= e($hasActiveFilters ? t('no_rows_filtered') : t('no_rows')) ?></p>
   <?php else: ?>
     <table class="data-table">
       <thead>
