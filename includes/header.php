@@ -9,6 +9,11 @@ $user = current_user();
 $real = real_user();
 $topLevelEntities = get_all_entities(true);
 $currentEntity = $_GET['entity'] ?? null;
+// Cache-bust static assets with their file mtime, so browsers that have
+// aggressively cached an older assets/js/app.js or style.css (no explicit
+// Cache-Control headers are sent for static files) always pick up the
+// latest version right after a deploy, instead of silently running stale JS.
+$assetVer = @filemtime(__DIR__ . '/../assets/js/app.js') ?: time();
 ?>
 <!DOCTYPE html>
 <html lang="<?= e(current_lang()) ?>">
@@ -16,7 +21,7 @@ $currentEntity = $_GET['entity'] ?? null;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($pageTitle) ?> - <?= e(t('app_name')) ?></title>
-<link rel="stylesheet" href="<?= strpos($_SERVER['PHP_SELF'], '/admin/') !== false ? '../assets/css/style.css' : 'assets/css/style.css' ?>">
+<link rel="stylesheet" href="<?= strpos($_SERVER['PHP_SELF'], '/admin/') !== false ? '../assets/css/style.css' : 'assets/css/style.css' ?>?v=<?= (int) $assetVer ?>">
 </head>
 <body class="theme-<?= e(current_theme()) ?>">
 <div class="app-shell">
