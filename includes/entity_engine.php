@@ -76,7 +76,8 @@ function get_relationships_as_child(int $entityId): array
     $stmt = db()->prepare('SELECT r.*, p.name AS parent_name, p.label AS parent_label, p.table_name AS parent_table
                             FROM entity_relationships r
                             JOIN entities p ON p.id = r.parent_entity_id
-                            WHERE r.child_entity_id = ?');
+                            WHERE r.child_entity_id = ?
+                            ORDER BY r.sort_order ASC, r.id ASC');
     $stmt->execute([$entityId]);
     return $stmt->fetchAll();
 }
@@ -87,9 +88,53 @@ function get_relationships_as_parent(int $entityId): array
     $stmt = db()->prepare('SELECT r.*, c.name AS child_name, c.label AS child_label, c.table_name AS child_table
                             FROM entity_relationships r
                             JOIN entities c ON c.id = r.child_entity_id
-                            WHERE r.parent_entity_id = ?');
+                            WHERE r.parent_entity_id = ?
+                            ORDER BY r.sort_order ASC, r.id ASC');
     $stmt->execute([$entityId]);
     return $stmt->fetchAll();
+}
+
+/**
+ * Next available sort_order for an entity's "fields", counting both native
+ * columns (entity_fields) and entity-reference fields (entity_relationships
+ * where this entity is the child) as one shared sequence, so newly added
+ * fields of either kind always append after everything that exists.
+ */
+function next_field_sort_order(int $entityId): int
+{
+    $pdo = db();
+    $stmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order), -1) FROM entity_fields WHERE entity_id = ?');
+    $stmt->execute([$entityId]);
+    $maxField = (int) $stmt->fetchColumn();
+
+    $stmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order), -1) FROM entity_relationships WHERE child_entity_id = ?');
+    $stmt->execute([$entityId]);
+    $maxRel = (int) $stmt->fetchColumn();
+
+    return max($maxField, $maxRel) + 1;
+}
+
+/**
+ * Merge an entity's native fields and its entity-reference fields
+ * (relationships where it is the child) into a single list ordered the way
+ * the admin defined them, each item tagged with 'kind' => 'field' or
+ * 'relationship' so callers can branch on how to render/process it.
+ */
+function merge_display_fields(array $fields, array $relationships): array
+{
+    $items = [];
+    foreach ($fields as $f) {
+        $f['kind'] = 'field';
+        $items[] = $f;
+    }
+    foreach ($relationships as $r) {
+        $r['kind'] = 'relationship';
+        $items[] = $r;
+    }
+    usort($items, function ($a, $b) {
+        return ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0);
+    });
+    return $items;
 }
 
 // ---------------------------------------------------------------------
@@ -122,9 +167,11 @@ function create_entity(string $name, string $label, bool $isTopLevel, array $fie
             $default = $field['default_value'] ?? null;
             $required = !empty($field['is_required']) ? 1 : 0;
 
+            $sortOrder = array_key_exists('sort_order', $field) ? (int) $field['sort_order'] : $order++;
+
             $fstmt = $pdo->prepare('INSERT INTO entity_fields (entity_id, name, label, field_type, max_length, default_value, is_required, sort_order)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-            $fstmt->execute([$entityId, $fieldName, $field['label'] ?: $field['name'], $type, $maxLen, $default, $required, $order++]);
+            $fstmt->execute([$entityId, $fieldName, $field['label'] ?: $field['name'], $type, $maxLen, $default, $required, $sortOrder]);
 
             $colType = sql_type_for($type, $maxLen);
             $colSql = "`$fieldName` $colType";
@@ -166,11 +213,11 @@ function add_field_to_entity(int $entityId, array $field): int
     $default = $field['default_value'] ?? null;
     $required = !empty($field['is_required']) ? 1 : 0;
 
-    $maxOrder = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), -1) FROM entity_fields WHERE entity_id = ' . $entityId)->fetchColumn();
+    $nextOrder = next_field_sort_order($entityId);
 
     $stmt = $pdo->prepare('INSERT INTO entity_fields (entity_id, name, label, field_type, max_length, default_value, is_required, sort_order)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$entityId, $fieldName, $field['label'] ?: $field['name'], $type, $maxLen, $default, $required, $maxOrder + 1]);
+    $stmt->execute([$entityId, $fieldName, $field['label'] ?: $field['name'], $type, $maxLen, $default, $required, $nextOrder]);
     $fieldId = (int) $pdo->lastInsertId();
 
     try {
@@ -188,8 +235,12 @@ function add_field_to_entity(int $entityId, array $field): int
 /**
  * Create a relationship: adds an FK column on the child table pointing to
  * the parent entity's primary key. one_to_one adds a UNIQUE constraint.
+ *
+ * $sortOrder controls where this shows up alongside the child entity's
+ * native fields (see merge_display_fields()). Pass null to auto-append
+ * after everything the child entity already has.
  */
-function create_relationship(int $childEntityId, int $parentEntityId, string $fkFieldName, string $type, ?string $label = null): int
+function create_relationship(int $childEntityId, int $parentEntityId, string $fkFieldName, string $type, ?string $label = null, ?int $sortOrder = null): int
 {
     // Same caveat as create_entity(): ALTER TABLE implicitly commits, so we
     // insert metadata first and compensate manually if the DDL fails.
@@ -200,11 +251,14 @@ function create_relationship(int $childEntityId, int $parentEntityId, string $fk
     }
     $type = $type === 'one_to_one' ? 'one_to_one' : 'one_to_many';
     $fkField = slugify($fkFieldName);
+    if ($sortOrder === null) {
+        $sortOrder = next_field_sort_order($childEntityId);
+    }
 
     $pdo = db();
-    $stmt = $pdo->prepare('INSERT INTO entity_relationships (child_entity_id, parent_entity_id, fk_field, relationship_type, label)
-                            VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([$childEntityId, $parentEntityId, $fkField, $type, $label]);
+    $stmt = $pdo->prepare('INSERT INTO entity_relationships (child_entity_id, parent_entity_id, fk_field, relationship_type, label, sort_order)
+                            VALUES (?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$childEntityId, $parentEntityId, $fkField, $type, $label, $sortOrder]);
     $relId = (int) $pdo->lastInsertId();
 
     try {

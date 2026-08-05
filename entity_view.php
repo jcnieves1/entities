@@ -29,6 +29,7 @@ if (!$row) {
 
 $parentRelationships = get_relationships_as_child($entity['id']);  // this row's own FK links "up"
 $childRelationships = get_relationships_as_parent($entity['id']);  // other entities that link "down" to this row
+$displayFields = merge_display_fields($fields, $parentRelationships); // both, in the admin's defined order
 
 $canEdit = has_permission($entity['id'], 'edit');
 $canDelete = has_permission($entity['id'], 'delete');
@@ -65,21 +66,22 @@ include __DIR__ . '/includes/header.php';
 <div class="card">
   <table class="data-table">
     <tbody>
-      <?php foreach ($fields as $f): $val = $row[$f['name']] ?? null; ?>
-        <tr>
-          <th style="width:220px;"><?= e($f['label']) ?></th>
-          <td><?= $f['field_type'] === 'Boolean' ? ($val ? e(t('yes')) : e(t('no'))) : e((string) $val) ?></td>
-        </tr>
-      <?php endforeach; ?>
-      <?php foreach ($parentRelationships as $r): $fkVal = $row[$r['fk_field']] ?? null; $parentEnt = get_entity((int) $r['parent_entity_id']); ?>
-        <tr>
-          <th><?= e($r['label'] ?: $r['parent_label']) ?></th>
-          <td>
-            <?php if ($fkVal): ?>
-              <a href="entity_view.php?entity=<?= e($parentEnt['name']) ?>&id=<?= (int) $fkVal ?>"><?= e(entity_fk_display($parentEnt, get_entity_fields($parentEnt['id']), (int) $fkVal)) ?></a>
-            <?php else: ?>&mdash;<?php endif; ?>
-          </td>
-        </tr>
+      <?php foreach ($displayFields as $item): ?>
+        <?php if ($item['kind'] === 'field'): $val = $row[$item['name']] ?? null; ?>
+          <tr>
+            <th style="width:220px;"><?= e($item['label']) ?></th>
+            <td><?= $item['field_type'] === 'Boolean' ? ($val ? e(t('yes')) : e(t('no'))) : e((string) $val) ?></td>
+          </tr>
+        <?php else: $fkVal = $row[$item['fk_field']] ?? null; $parentEnt = get_entity((int) $item['parent_entity_id']); ?>
+          <tr>
+            <th><?= e($item['label'] ?: $item['parent_label']) ?></th>
+            <td>
+              <?php if ($fkVal): ?>
+                <a href="entity_view.php?entity=<?= e($parentEnt['name']) ?>&id=<?= (int) $fkVal ?>"><?= e(entity_fk_display($parentEnt, get_entity_fields($parentEnt['id']), (int) $fkVal)) ?></a>
+              <?php else: ?>&mdash;<?php endif; ?>
+            </td>
+          </tr>
+        <?php endif; ?>
       <?php endforeach; ?>
     </tbody>
   </table>

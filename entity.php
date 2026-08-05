@@ -22,6 +22,7 @@ if (!has_permission($entity['id'], 'view')) {
 $fields = get_entity_fields($entity['id']);
 $childRelationships = get_relationships_as_parent($entity['id']);
 $parentRelationships = get_relationships_as_child($entity['id']);
+$displayFields = merge_display_fields($fields, $parentRelationships); // both, in the admin's defined order
 
 // Optional filter: viewing this entity as the child list of a specific parent row.
 $parentField = $_GET['parent_field'] ?? null;
@@ -74,8 +75,9 @@ $qs = extra_qs($parentField, $parentId, $parentEntityName);
       <thead>
         <tr>
           <th>ID</th>
-          <?php foreach ($fields as $f): ?><th><?= e($f['label']) ?></th><?php endforeach; ?>
-          <?php foreach ($parentRelationships as $r): ?><th><?= e($r['label'] ?: $r['parent_label']) ?></th><?php endforeach; ?>
+          <?php foreach ($displayFields as $item): ?>
+            <th><?= e($item['kind'] === 'field' ? $item['label'] : ($item['label'] ?: $item['parent_label'])) ?></th>
+          <?php endforeach; ?>
           <th><?= e(t('actions')) ?></th>
         </tr>
       </thead>
@@ -83,28 +85,24 @@ $qs = extra_qs($parentField, $parentId, $parentEntityName);
         <?php foreach ($result['rows'] as $row): ?>
           <tr>
             <td>#<?= (int) $row['id'] ?></td>
-            <?php foreach ($fields as $f): ?>
+            <?php foreach ($displayFields as $item): ?>
               <td>
-                <?php
-                  $val = $row[$f['name']] ?? null;
-                  if ($f['field_type'] === 'Boolean') {
-                      echo $val ? e(t('yes')) : e(t('no'));
-                  } else {
-                      echo e((string) $val);
-                  }
-                ?>
-              </td>
-            <?php endforeach; ?>
-            <?php foreach ($parentRelationships as $r): ?>
-              <td>
-                <?php
-                  $fkVal = $row[$r['fk_field']] ?? null;
-                  if ($fkVal) {
-                      $parentEnt = get_entity((int) $r['parent_entity_id']);
-                      echo e(entity_fk_display($parentEnt, get_entity_fields($parentEnt['id']), (int) $fkVal));
-                  } else {
-                      echo '&mdash;';
-                  }
+                <?php if ($item['kind'] === 'field'):
+                    $val = $row[$item['name']] ?? null;
+                    if ($item['field_type'] === 'Boolean') {
+                        echo $val ? e(t('yes')) : e(t('no'));
+                    } else {
+                        echo e((string) $val);
+                    }
+                  else:
+                    $fkVal = $row[$item['fk_field']] ?? null;
+                    if ($fkVal) {
+                        $parentEnt = get_entity((int) $item['parent_entity_id']);
+                        echo e(entity_fk_display($parentEnt, get_entity_fields($parentEnt['id']), (int) $fkVal));
+                    } else {
+                        echo '&mdash;';
+                    }
+                  endif;
                 ?>
               </td>
             <?php endforeach; ?>

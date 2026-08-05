@@ -83,6 +83,7 @@ if (!$connError && !$alreadyInstalled && $_SERVER['REQUEST_METHOD'] === 'POST') 
             fk_field VARCHAR(64) NOT NULL,
             relationship_type ENUM('one_to_one','one_to_many') NOT NULL DEFAULT 'one_to_many',
             label VARCHAR(150) DEFAULT NULL,
+            sort_order INT DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (child_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
             FOREIGN KEY (parent_entity_id) REFERENCES entities(id) ON DELETE CASCADE

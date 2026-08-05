@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/entity_engine.php';
 if (!is_installed()) { redirect('../install.php'); }
 require_admin();
 
-$id = isset($_GET['id']) ? (int) $_GET['id'] : null;
+$id = isset($_GET['id']) ? (int) $_GET['id'] : (isset($_POST['id']) ? (int) $_POST['id'] : null);
 $entity = $id ? get_entity($id) : null;
 if ($id && !$entity) {
     flash('error', 'Entity not found.');
@@ -25,19 +25,37 @@ if (!$entity && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? ''
     $isTopLevel = !empty($_POST['is_top_level']);
     $fieldsInput = $_POST['fields'] ?? [];
 
-    $fields = [];
+    // A field's "type" can be a native type (Int/String/...) or "entity:<id>"
+    // meaning "this field references a row of that other entity". We keep
+    // native fields and reference fields in two buckets but assign each one
+    // a shared, incrementing sort_order so the final form/list still shows
+    // them interleaved in the order the admin defined them.
+    $nativeFields = [];
+    $referenceFields = [];
+    $order = 0;
     foreach ($fieldsInput as $f) {
         if (trim($f['name'] ?? '') === '') {
             continue;
         }
-        $fields[] = [
-            'name' => $f['name'],
-            'label' => trim($f['label'] ?? '') ?: $f['name'],
-            'type' => $f['type'] ?? 'String',
-            'max_length' => $f['max_length'] ?? null,
-            'default_value' => $f['default_value'] ?? null,
-            'is_required' => !empty($f['is_required']),
-        ];
+        $type = $f['type'] ?? 'String';
+        if (strpos($type, 'entity:') === 0) {
+            $referenceFields[] = [
+                'name' => $f['name'],
+                'label' => trim($f['label'] ?? '') ?: $f['name'],
+                'target_entity_id' => (int) substr($type, 7),
+                'sort_order' => $order++,
+            ];
+        } else {
+            $nativeFields[] = [
+                'name' => $f['name'],
+                'label' => trim($f['label'] ?? '') ?: $f['name'],
+                'type' => $type,
+                'max_length' => $f['max_length'] ?? null,
+                'default_value' => $f['default_value'] ?? null,
+                'is_required' => !empty($f['is_required']),
+                'sort_order' => $order++,
+            ];
+        }
     }
 
     if (!$name || !$label) {
@@ -46,7 +64,16 @@ if (!$entity && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? ''
         $error = 'An entity with that internal name already exists.';
     } else {
         try {
-            create_entity($name, $label, $isTopLevel, $fields);
+            $newEntityId = create_entity($name, $label, $isTopLevel, $nativeFields);
+            try {
+                foreach ($referenceFields as $ref) {
+                    create_relationship($newEntityId, $ref['target_entity_id'], $ref['name'], 'one_to_many', $ref['label'], $ref['sort_order']);
+                }
+            } catch (Throwable $e) {
+                // Roll back the whole new entity (table + metadata) rather than leaving a half-built one.
+                delete_entity($newEntityId);
+                throw $e;
+            }
             flash('success', t('entity_created'));
             redirect('entities.php');
         } catch (Throwable $e) {
@@ -72,16 +99,22 @@ if ($entity && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '')
 if ($entity && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_field') {
     require_csrf();
     $f = $_POST['field'] ?? [];
+    $type = $f['type'] ?? 'String';
     if (trim($f['name'] ?? '') !== '') {
         try {
-            add_field_to_entity($entity['id'], [
-                'name' => $f['name'],
-                'label' => trim($f['label'] ?? '') ?: $f['name'],
-                'type' => $f['type'] ?? 'String',
-                'max_length' => $f['max_length'] ?? null,
-                'default_value' => $f['default_value'] ?? null,
-                'is_required' => !empty($f['is_required']),
-            ]);
+            if (strpos($type, 'entity:') === 0) {
+                $targetEntityId = (int) substr($type, 7);
+                create_relationship($entity['id'], $targetEntityId, $f['name'], 'one_to_many', trim($f['label'] ?? '') ?: $f['name']);
+            } else {
+                add_field_to_entity($entity['id'], [
+                    'name' => $f['name'],
+                    'label' => trim($f['label'] ?? '') ?: $f['name'],
+                    'type' => $type,
+                    'max_length' => $f['max_length'] ?? null,
+                    'default_value' => $f['default_value'] ?? null,
+                    'is_required' => !empty($f['is_required']),
+                ]);
+            }
             flash('success', t('field_added'));
         } catch (Throwable $e) {
             flash('error', 'Could not add field: ' . $e->getMessage());
@@ -92,6 +125,11 @@ if ($entity && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '')
 
 $pageTitle = $entity ? $entity['label'] : t('new_entity');
 $fieldTypes = FIELD_TYPES;
+// Entities that can be picked as a field "type" (creates a relationship).
+// Exclude the entity being edited itself, to keep self-references off for now.
+$referenceableEntities = array_values(array_filter(get_all_entities(), function ($e) use ($entity) {
+    return !$entity || (int) $e['id'] !== (int) $entity['id'];
+}));
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -119,13 +157,21 @@ include __DIR__ . '/../includes/header.php';
       </label>
 
       <h3><?= e(t('fields')) ?></h3>
+      <p class="text-muted"><?= e(t('field_type_entity_hint')) ?></p>
       <div id="fields-wrap">
         <div class="field-row">
           <label><?= e(t('field_name')) ?><input type="text" name="fields[0][name]" placeholder="e.g. title"></label>
           <label><?= e(t('field_label')) ?><input type="text" name="fields[0][label]" placeholder="e.g. Title"></label>
           <label><?= e(t('field_type')) ?>
             <select name="fields[0][type]">
-              <?php foreach ($fieldTypes as $ft): ?><option value="<?= e($ft) ?>"><?= e($ft) ?></option><?php endforeach; ?>
+              <optgroup label="<?= e(t('native_types')) ?>">
+                <?php foreach ($fieldTypes as $ft): ?><option value="<?= e($ft) ?>"><?= e($ft) ?></option><?php endforeach; ?>
+              </optgroup>
+              <?php if ($referenceableEntities): ?>
+              <optgroup label="<?= e(t('entity_reference_types')) ?>">
+                <?php foreach ($referenceableEntities as $re): ?><option value="entity:<?= (int) $re['id'] ?>"><?= e($re['label']) ?></option><?php endforeach; ?>
+              </optgroup>
+              <?php endif; ?>
             </select>
           </label>
           <label><?= e(t('max_length')) ?><input type="number" name="fields[0][max_length]" min="1" placeholder="255"></label>
@@ -149,7 +195,14 @@ include __DIR__ . '/../includes/header.php';
       <label><?= e(t('field_label')) ?><input type="text" name="fields[__INDEX__][label]"></label>
       <label><?= e(t('field_type')) ?>
         <select name="fields[__INDEX__][type]">
-          <?php foreach ($fieldTypes as $ft): ?><option value="<?= e($ft) ?>"><?= e($ft) ?></option><?php endforeach; ?>
+          <optgroup label="<?= e(t('native_types')) ?>">
+            <?php foreach ($fieldTypes as $ft): ?><option value="<?= e($ft) ?>"><?= e($ft) ?></option><?php endforeach; ?>
+          </optgroup>
+          <?php if ($referenceableEntities): ?>
+          <optgroup label="<?= e(t('entity_reference_types')) ?>">
+            <?php foreach ($referenceableEntities as $re): ?><option value="entity:<?= (int) $re['id'] ?>"><?= e($re['label']) ?></option><?php endforeach; ?>
+          </optgroup>
+          <?php endif; ?>
         </select>
       </label>
       <label><?= e(t('max_length')) ?><input type="number" name="fields[__INDEX__][max_length]" min="1"></label>
@@ -177,15 +230,26 @@ include __DIR__ . '/../includes/header.php';
     <table class="data-table">
       <thead><tr><th><?= e(t('field_name')) ?></th><th><?= e(t('field_label')) ?></th><th><?= e(t('field_type')) ?></th><th><?= e(t('max_length')) ?></th><th><?= e(t('default_value')) ?></th><th><?= e(t('required')) ?></th></tr></thead>
       <tbody>
-        <?php foreach (get_entity_fields($entity['id']) as $f): ?>
-          <tr>
-            <td><code><?= e($f['name']) ?></code></td>
-            <td><?= e($f['label']) ?></td>
-            <td><?= e($f['field_type']) ?></td>
-            <td><?= e((string) $f['max_length']) ?></td>
-            <td><?= e((string) $f['default_value']) ?></td>
-            <td><?= $f['is_required'] ? e(t('yes')) : e(t('no')) ?></td>
-          </tr>
+        <?php foreach (merge_display_fields(get_entity_fields($entity['id']), get_relationships_as_child($entity['id'])) as $item): ?>
+          <?php if ($item['kind'] === 'field'): ?>
+            <tr>
+              <td><code><?= e($item['name']) ?></code></td>
+              <td><?= e($item['label']) ?></td>
+              <td><?= e($item['field_type']) ?></td>
+              <td><?= e((string) $item['max_length']) ?></td>
+              <td><?= e((string) $item['default_value']) ?></td>
+              <td><?= $item['is_required'] ? e(t('yes')) : e(t('no')) ?></td>
+            </tr>
+          <?php else: ?>
+            <tr>
+              <td><code><?= e($item['fk_field']) ?></code></td>
+              <td><?= e($item['label'] ?: $item['parent_label']) ?></td>
+              <td><span class="badge">&rarr; <?= e($item['parent_label']) ?></span></td>
+              <td>&mdash;</td>
+              <td>&mdash;</td>
+              <td>&mdash;</td>
+            </tr>
+          <?php endif; ?>
         <?php endforeach; ?>
       </tbody>
     </table>
@@ -199,7 +263,14 @@ include __DIR__ . '/../includes/header.php';
         <label><?= e(t('field_label')) ?><input type="text" name="field[label]"></label>
         <label><?= e(t('field_type')) ?>
           <select name="field[type]">
-            <?php foreach ($fieldTypes as $ft): ?><option value="<?= e($ft) ?>"><?= e($ft) ?></option><?php endforeach; ?>
+            <optgroup label="<?= e(t('native_types')) ?>">
+              <?php foreach ($fieldTypes as $ft): ?><option value="<?= e($ft) ?>"><?= e($ft) ?></option><?php endforeach; ?>
+            </optgroup>
+            <?php if ($referenceableEntities): ?>
+            <optgroup label="<?= e(t('entity_reference_types')) ?>">
+              <?php foreach ($referenceableEntities as $re): ?><option value="entity:<?= (int) $re['id'] ?>"><?= e($re['label']) ?></option><?php endforeach; ?>
+            </optgroup>
+            <?php endif; ?>
           </select>
         </label>
         <label><?= e(t('max_length')) ?><input type="number" name="field[max_length]" min="1" placeholder="255"></label>

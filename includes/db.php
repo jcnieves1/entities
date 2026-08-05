@@ -27,8 +27,29 @@ function is_installed(): bool
 {
     try {
         db()->query('SELECT 1 FROM users LIMIT 1');
+        run_migrations();
         return true;
     } catch (Throwable $e) {
         return false;
+    }
+}
+
+/**
+ * Lightweight self-migration for installs created before a schema change.
+ * Safe to run on every request: each check is a cheap indexed lookup and
+ * only ALTERs when the column is actually missing.
+ */
+function run_migrations(): void
+{
+    $pdo = db();
+
+    // entity_relationships.sort_order: lets relationship-based fields
+    // (entity-reference field types) be interleaved with native fields in
+    // the order the admin defined them, instead of always trailing.
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'entity_relationships' AND COLUMN_NAME = 'sort_order'");
+    $stmt->execute();
+    if (!$stmt->fetchColumn()) {
+        $pdo->exec('ALTER TABLE entity_relationships ADD COLUMN sort_order INT DEFAULT 0');
     }
 }

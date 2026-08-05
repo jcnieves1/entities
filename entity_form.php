@@ -30,6 +30,7 @@ if (!$isEdit && !has_permission($entity['id'], 'create')) {
 
 $fields = get_entity_fields($entity['id']);
 $parentRelationships = get_relationships_as_child($entity['id']); // FK columns this entity holds
+$displayFields = merge_display_fields($fields, $parentRelationships); // both, in the admin's defined order
 
 $row = $isEdit ? entity_get_row($entity, $id) : [];
 if ($isEdit && !$row) {
@@ -106,36 +107,36 @@ include __DIR__ . '/includes/header.php';
       <input type="hidden" name="parent_entity" value="<?= e($parentEntityName) ?>">
     <?php endif; ?>
 
-    <?php foreach ($fields as $f): $val = $row[$f['name']] ?? $f['default_value']; ?>
-      <label>
-        <?= e($f['label']) ?><?= $f['is_required'] ? ' *' : '' ?>
-        <?php if ($f['field_type'] === 'Boolean'): ?>
-          <input type="checkbox" name="field[<?= e($f['name']) ?>]" value="1" <?= !empty($val) ? 'checked' : '' ?>>
-        <?php elseif ($f['field_type'] === 'Date'): ?>
-          <input type="date" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
-        <?php elseif ($f['field_type'] === 'Int'): ?>
-          <input type="number" step="1" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
-        <?php elseif ($f['field_type'] === 'Float'): ?>
-          <input type="number" step="any" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
-        <?php else: ?>
-          <input type="text" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" maxlength="<?= (int) ($f['max_length'] ?: 255) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
-        <?php endif; ?>
-      </label>
-    <?php endforeach; ?>
-
-    <?php foreach ($parentRelationships as $rel): $col = $rel['fk_field']; ?>
-      <?php if ($parentField === $col && $parentId): ?>
-        <p class="text-muted"><?= e($rel['label'] ?: $rel['parent_label']) ?>: <strong>#<?= (int) $parentId ?></strong> (<?= e(t('record')) ?> <?= e(t('yes')) ?>)</p>
-      <?php else: ?>
-        <?php $parentEnt = get_entity((int) $rel['parent_entity_id']); $options = get_entity_options($parentEnt); ?>
-        <label><?= e($rel['label'] ?: $rel['parent_label']) ?>
-          <select name="fk[<?= e($col) ?>]">
-            <option value="">--</option>
-            <?php foreach ($options as $oid => $label): ?>
-              <option value="<?= (int) $oid ?>" <?= isset($row[$col]) && (int) $row[$col] === (int) $oid ? 'selected' : '' ?>><?= e($label) ?></option>
-            <?php endforeach; ?>
-          </select>
+    <?php foreach ($displayFields as $item): ?>
+      <?php if ($item['kind'] === 'field'): $f = $item; $val = $row[$f['name']] ?? $f['default_value']; ?>
+        <label>
+          <?= e($f['label']) ?><?= $f['is_required'] ? ' *' : '' ?>
+          <?php if ($f['field_type'] === 'Boolean'): ?>
+            <input type="checkbox" name="field[<?= e($f['name']) ?>]" value="1" <?= !empty($val) ? 'checked' : '' ?>>
+          <?php elseif ($f['field_type'] === 'Date'): ?>
+            <input type="date" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
+          <?php elseif ($f['field_type'] === 'Int'): ?>
+            <input type="number" step="1" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
+          <?php elseif ($f['field_type'] === 'Float'): ?>
+            <input type="number" step="any" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
+          <?php else: ?>
+            <input type="text" name="field[<?= e($f['name']) ?>]" value="<?= e((string) $val) ?>" maxlength="<?= (int) ($f['max_length'] ?: 255) ?>" <?= $f['is_required'] ? 'required' : '' ?>>
+          <?php endif; ?>
         </label>
+      <?php else: $rel = $item; $col = $rel['fk_field']; ?>
+        <?php if ($parentField === $col && $parentId): ?>
+          <p class="text-muted"><?= e($rel['label'] ?: $rel['parent_label']) ?>: <strong>#<?= (int) $parentId ?></strong> (<?= e(t('record')) ?> <?= e(t('yes')) ?>)</p>
+        <?php else: ?>
+          <?php $parentEnt = get_entity((int) $rel['parent_entity_id']); $options = get_entity_options($parentEnt); ?>
+          <label><?= e($rel['label'] ?: $rel['parent_label']) ?>
+            <select name="fk[<?= e($col) ?>]">
+              <option value="">--</option>
+              <?php foreach ($options as $oid => $label): ?>
+                <option value="<?= (int) $oid ?>" <?= isset($row[$col]) && (int) $row[$col] === (int) $oid ? 'selected' : '' ?>><?= e($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+        <?php endif; ?>
       <?php endif; ?>
     <?php endforeach; ?>
 

@@ -145,4 +145,9 @@ return [
     'delete_entity_parents_line' => 'Esta entidad actualmente se vincula con las siguientes entidades (estas relaciones también se eliminarán):',
     'delete_entity_type_to_confirm' => 'Escribe %s para confirmar esta eliminación permanente:',
     'delete_entity_confirm_button' => 'Eliminar esta entidad permanentemente',
+
+    // Admin: campos de tipo entidad (referencia)
+    'native_types' => 'Tipos nativos',
+    'entity_reference_types' => 'Entidades existentes (crea una relación)',
+    'field_type_entity_hint' => 'Elige un tipo nativo (Int, String, Date, Boolean, Float) para un campo simple, o elige una entidad existente para que este campo sea una referencia: aparecerá como una lista desplegable con las filas de esa entidad, y la relación entre ambas entidades se crea automáticamente.',
 ];

@@ -145,4 +145,9 @@ return [
     'delete_entity_parents_line' => 'This entity currently links to the following entities (these relationships will also be removed):',
     'delete_entity_type_to_confirm' => 'Type %s to confirm this permanent deletion:',
     'delete_entity_confirm_button' => 'Permanently delete this entity',
+
+    // Admin: entity-reference field types
+    'native_types' => 'Native types',
+    'entity_reference_types' => 'Existing entities (creates a relationship)',
+    'field_type_entity_hint' => 'Pick a native type (Int, String, Date, Boolean, Float) for a plain field, or pick an existing entity to make this field a reference — it will show up as a dropdown of that entity\'s rows, and the relationship between the two entities is created automatically.',
 ];
