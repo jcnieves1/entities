@@ -191,7 +191,8 @@ $hasActiveFilters = (bool) $advancedFilters;
                     $fkVal = $row[$item['fk_field']] ?? null;
                     if ($fkVal) {
                         $parentEnt = get_entity((int) $item['parent_entity_id']);
-                        echo e(entity_fk_display($parentEnt, get_entity_fields($parentEnt['id']), (int) $fkVal));
+                        $fkLabel = entity_fk_display($parentEnt, get_entity_fields($parentEnt['id']), (int) $fkVal);
+                        echo '<a href="entity_view.php?entity=' . e($parentEnt['name']) . '&id=' . (int) $fkVal . '">' . e($fkLabel) . '</a>';
                     } else {
                         echo '&mdash;';
                     }
