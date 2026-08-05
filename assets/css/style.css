@@ -226,6 +226,88 @@ table.data-table tr:hover td { background: var(--surface-2); }
 .tabs a { padding: 8px 14px; border-bottom: 2px solid transparent; color: var(--text-muted); font-size: 14px; }
 .tabs a.active { color: var(--primary); border-color: var(--primary); }
 
-.form-actions { display: flex; gap: 10px; margin-top: 16px; }
+.form-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 .text-muted { color: var(--text-muted); font-size: 13px; }
 .inline-form { display: inline; }
+
+/* Tables can get wide (many columns) - let the surrounding card scroll
+   horizontally on narrow screens instead of squashing/breaking the layout. */
+.card { overflow-x: auto; }
+
+/* ---------- Mobile nav (hamburger) ---------- */
+.hamburger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mobile-brand { display: none; font-weight: 700; font-size: 15px; margin-right: auto; }
+.sidebar-backdrop { display: none; }
+
+/* ---------- Responsive breakpoints ---------- */
+@media (max-width: 860px) {
+  .app-shell { display: block; }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    max-width: 82vw;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    overflow-y: auto;
+    box-shadow: 2px 0 18px rgba(0,0,0,0.35);
+  }
+  .app-shell.sidebar-open .sidebar { transform: translateX(0); }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .app-shell.sidebar-open .sidebar-backdrop { opacity: 1; pointer-events: auto; }
+
+  .main { width: 100%; }
+  .hamburger-btn { display: inline-flex; }
+  .mobile-brand { display: inline-block; }
+
+  .topbar { padding: 10px 14px; gap: 8px; flex-wrap: wrap; row-gap: 8px; }
+  .topbar .user-chip { display: none; }
+  .impersonate-banner { padding: 8px 14px; flex-wrap: wrap; }
+
+  .content { padding: 14px; }
+  .card { padding: 14px; }
+  .page-header { flex-wrap: wrap; gap: 10px; }
+  .page-header h1 { font-size: 18px; }
+
+  .field-row { grid-template-columns: 1fr; }
+  .cond-row { flex-direction: column; align-items: stretch; }
+  .cond-source, .cond-operator, .cond-value { min-width: 0; width: 100%; }
+
+  table.data-table th, table.data-table td { padding: 8px; font-size: 13px; white-space: nowrap; }
+}
+
+@media (max-width: 480px) {
+  .auth-card { padding: 22px 18px; }
+  .btn { padding: 8px 12px; font-size: 13px; }
+  .topbar { justify-content: space-between; }
+  .form-actions { flex-direction: column; align-items: stretch; }
+  .form-actions .btn { text-align: center; }
+}

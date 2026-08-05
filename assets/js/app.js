@@ -9,6 +9,33 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Mobile hamburger menu: slide the sidebar in/out as an overlay on small screens.
+  var appShell = document.querySelector('.app-shell');
+  var sidebarToggle = document.getElementById('sidebar-toggle');
+  var sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  if (appShell && sidebarToggle) {
+    var closeSidebar = function () {
+      appShell.classList.remove('sidebar-open');
+      sidebarToggle.setAttribute('aria-expanded', 'false');
+    };
+    sidebarToggle.addEventListener('click', function () {
+      var isOpen = appShell.classList.toggle('sidebar-open');
+      sidebarToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+    }
+    // Close automatically after picking a nav link, so it doesn't stay open
+    // covering the page you just navigated to.
+    document.querySelectorAll('.sidebar nav a').forEach(function (link) {
+      link.addEventListener('click', closeSidebar);
+    });
+    // Escape key closes it too.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeSidebar(); }
+    });
+  }
+
   // Dynamic field rows in the entity builder (admin/entity_edit.php)
   var addFieldBtn = document.getElementById('add-field-btn');
   var fieldsWrap = document.getElementById('fields-wrap');

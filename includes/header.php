@@ -25,6 +25,7 @@ $assetVer = @filemtime(__DIR__ . '/../assets/js/app.js') ?: time();
 </head>
 <body class="theme-<?= e(current_theme()) ?>">
 <div class="app-shell">
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <aside class="sidebar">
     <div class="brand"><?= e(t('app_name')) ?></div>
     <nav>
@@ -57,6 +58,8 @@ $assetVer = @filemtime(__DIR__ . '/../assets/js/app.js') ?: time();
     <?php endif; ?>
 
     <div class="topbar">
+      <button type="button" class="hamburger-btn" id="sidebar-toggle" aria-label="<?= e(t('menu')) ?>" aria-expanded="false">&#9776;</button>
+      <span class="mobile-brand"><?= e(t('app_name')) ?></span>
       <div class="spacer"></div>
       <span class="user-chip"><?= e(t('welcome')) ?>, <?= e($real['name'] ?? '') ?></span>
       <?php

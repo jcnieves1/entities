@@ -25,6 +25,7 @@ return [
     'yes' => 'Sí',
     'no' => 'No',
     'close' => 'Cerrar',
+    'menu' => 'Menú',
 
     // Auth
     'login_title' => 'Iniciar sesión',

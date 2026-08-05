@@ -25,6 +25,7 @@ return [
     'yes' => 'Yes',
     'no' => 'No',
     'close' => 'Close',
+    'menu' => 'Menu',
 
     // Auth
     'login_title' => 'Log in',
