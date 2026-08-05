@@ -7,9 +7,9 @@
 
 // ---- Database settings ----
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'entity_system');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_NAME', 'juanca44_entities');
+define('DB_USER', 'juanca44_entities_user');
+define('DB_PASS', 'Michael1Scott');
 define('DB_CHARSET', 'utf8mb4');
 
 // ---- App settings ----
