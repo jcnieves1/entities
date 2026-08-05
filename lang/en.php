@@ -133,4 +133,16 @@ return [
     'next' => 'Next',
     'record' => 'Record',
     'top_level_entities' => 'Navigation',
+
+    // Admin: delete entity
+    'delete_entity' => 'Delete entity',
+    'entity_deleted' => 'Entity, its table, its data and its relationships were permanently deleted.',
+    'delete_entity_warning_title' => 'This action is permanent and cannot be undone.',
+    'delete_entity_warning_body' => 'Deleting this entity will drop its database table entirely, permanently destroying every row stored in it, and will remove its relationships with other entities.',
+    'delete_entity_rows_line' => 'Data rows that will be permanently deleted: %s',
+    'delete_entity_children_line' => 'The following entities point to this one and will lose that link (their own records and tables are NOT deleted, only the relationship/column is removed):',
+    'delete_entity_child_note' => 'the foreign key column will be dropped',
+    'delete_entity_parents_line' => 'This entity currently links to the following entities (these relationships will also be removed):',
+    'delete_entity_type_to_confirm' => 'Type %s to confirm this permanent deletion:',
+    'delete_entity_confirm_button' => 'Permanently delete this entity',
 ];

@@ -383,6 +383,63 @@ function entity_fk_display(array $parentEntity, array $parentFields, int $id): s
     return $nameField && !empty($row[$nameField]) ? $row[$nameField] . " (#$id)" : "#$id";
 }
 
+/** Number of data rows currently stored in an entity's table. */
+function entity_row_count(array $entity): int
+{
+    $table = $entity['table_name'];
+    return (int) db()->query("SELECT COUNT(*) FROM `$table`")->fetchColumn();
+}
+
+/**
+ * Permanently delete an entity: its own data table (and every row in it),
+ * the foreign-key constraint/column on any child table that links to it,
+ * and its metadata (fields, relationships, role permissions).
+ *
+ * This is destructive and irreversible - callers must confirm with the
+ * admin before invoking it. Relationships where this entity is the CHILD
+ * simply disappear along with its own table. Relationships where this
+ * entity is the PARENT are unwound first: the FK column is dropped from
+ * the other entity's table, but that other entity's table and its own
+ * data are left intact.
+ */
+function delete_entity(int $entityId): void
+{
+    $pdo = db();
+    $entity = get_entity($entityId);
+    if (!$entity) {
+        throw new RuntimeException('Entity not found');
+    }
+
+    // 1) Unwind relationships where this entity is the parent: drop the FK
+    //    constraint (and column) from each child table first, since MySQL
+    //    refuses to drop a table that's still referenced by a live FK.
+    foreach (get_relationships_as_parent($entityId) as $rel) {
+        $childTable = $rel['child_table'];
+        $fkField = $rel['fk_field'];
+        $constraintName = 'fk_' . $childTable . '_' . $fkField;
+        try {
+            $pdo->exec("ALTER TABLE `$childTable` DROP FOREIGN KEY `$constraintName`");
+        } catch (Throwable $e) {
+            // Constraint may already be gone; continue - the column drop below still cleans up.
+        }
+        try {
+            $pdo->exec("ALTER TABLE `$childTable` DROP COLUMN `$fkField`");
+        } catch (Throwable $e) {
+            // Column may already be gone; nothing more we can do here.
+        }
+    }
+
+    // 2) Drop the entity's own table - this destroys all of its data.
+    $table = $entity['table_name'];
+    $pdo->exec("DROP TABLE IF EXISTS `$table`");
+
+    // 3) Delete the entity's metadata row. ON DELETE CASCADE takes care of
+    //    entity_fields, entity_relationships (both as parent and child) and
+    //    role_permissions rows that reference this entity.
+    $stmt = $pdo->prepare('DELETE FROM entities WHERE id = ?');
+    $stmt->execute([$entityId]);
+}
+
 /** All rows of an entity as id => display-label pairs, for building FK <select> dropdowns. */
 function get_entity_options(array $entity): array
 {

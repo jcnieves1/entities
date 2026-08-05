@@ -133,4 +133,16 @@ return [
     'next' => 'Siguiente',
     'record' => 'Registro',
     'top_level_entities' => 'Navegación',
+
+    // Admin: eliminar entidad
+    'delete_entity' => 'Eliminar entidad',
+    'entity_deleted' => 'La entidad, su tabla, sus datos y sus relaciones fueron eliminados permanentemente.',
+    'delete_entity_warning_title' => 'Esta acción es permanente y no se puede deshacer.',
+    'delete_entity_warning_body' => 'Eliminar esta entidad borrará por completo su tabla en la base de datos, destruyendo permanentemente cada fila almacenada en ella, y eliminará sus relaciones con otras entidades.',
+    'delete_entity_rows_line' => 'Filas de datos que se eliminarán permanentemente: %s',
+    'delete_entity_children_line' => 'Las siguientes entidades apuntan a esta y perderán ese vínculo (sus propios registros y tablas NO se eliminan, solo se elimina la relación/columna):',
+    'delete_entity_child_note' => 'se eliminará la columna de clave foránea',
+    'delete_entity_parents_line' => 'Esta entidad actualmente se vincula con las siguientes entidades (estas relaciones también se eliminarán):',
+    'delete_entity_type_to_confirm' => 'Escribe %s para confirmar esta eliminación permanente:',
+    'delete_entity_confirm_button' => 'Eliminar esta entidad permanentemente',
 ];
