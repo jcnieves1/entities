@@ -48,6 +48,7 @@ if (!$connError && !$alreadyInstalled && $_SERVER['REQUEST_METHOD'] === 'POST') 
             secret_answer_hash VARCHAR(255) NOT NULL,
             role_id INT NOT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
+            last_seen_at DATETIME DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (role_id) REFERENCES roles(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");

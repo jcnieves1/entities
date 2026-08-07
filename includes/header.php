@@ -20,6 +20,7 @@ $assetVer = @filemtime(__DIR__ . '/../assets/js/app.js') ?: time();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<?php if (!empty($metaRefresh)): ?><meta http-equiv="refresh" content="<?= (int) $metaRefresh ?>"><?php endif; ?>
 <title><?= e($pageTitle) ?> - <?= e(t('app_name')) ?></title>
 <link rel="stylesheet" href="<?= strpos($_SERVER['PHP_SELF'], '/admin/') !== false ? '../assets/css/style.css' : 'assets/css/style.css' ?>?v=<?= (int) $assetVer ?>">
 </head>
@@ -45,6 +46,7 @@ $assetVer = @filemtime(__DIR__ . '/../assets/js/app.js') ?: time();
         <a href="<?= e($adminBase) ?>roles.php" class="<?= basename($_SERVER['PHP_SELF']) === 'roles.php' ? 'active' : '' ?>"><?= e(t('roles')) ?></a>
         <a href="<?= e($adminBase) ?>permissions.php" class="<?= basename($_SERVER['PHP_SELF']) === 'permissions.php' ? 'active' : '' ?>"><?= e(t('permissions')) ?></a>
         <a href="<?= e($adminBase) ?>users.php" class="<?= basename($_SERVER['PHP_SELF']) === 'users.php' ? 'active' : '' ?>"><?= e(t('users')) ?></a>
+        <a href="<?= e($adminBase) ?>online_users.php" class="<?= basename($_SERVER['PHP_SELF']) === 'online_users.php' ? 'active' : '' ?>"><?= e(t('online_users')) ?></a>
       <?php endif; ?>
     </nav>
   </aside>

@@ -87,4 +87,12 @@ function run_migrations(): void
             FOREIGN KEY (via_relationship_id) REFERENCES entity_relationships(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
+
+    // users.last_seen_at: powers the "who's online" admin page.
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'last_seen_at'");
+    $stmt->execute();
+    if (!$stmt->fetchColumn()) {
+        $pdo->exec('ALTER TABLE users ADD COLUMN last_seen_at DATETIME DEFAULT NULL');
+    }
 }

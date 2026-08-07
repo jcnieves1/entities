@@ -207,6 +207,10 @@ table.data-table tr:hover td { background: var(--surface-2); }
 
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: var(--surface-2); border: 1px solid var(--border); }
 
+.status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; }
+.status-dot.status-online { background: #2ecc71; box-shadow: 0 0 0 3px rgba(46,204,113,0.2); }
+.status-dot.status-offline { background: #9aa4b2; }
+
 .field-row { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr 0.8fr 1fr 0.6fr 0.4fr; gap: 8px; align-items: end; margin-bottom: 10px; }
 .field-row label { margin-bottom: 0; }
 .field-row .remove-field-btn { height: 36px; }

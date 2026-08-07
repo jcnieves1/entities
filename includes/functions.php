@@ -137,3 +137,33 @@ function slugify(string $value): string
 {
     return sanitize_identifier($value, 64);
 }
+
+/** Human-friendly relative time, e.g. "just now", "5 minutes ago", "3 days ago". Null/unparsable -> t('never'). */
+function time_ago(?string $datetime): string
+{
+    if (!$datetime) {
+        return t('never');
+    }
+    $ts = strtotime($datetime);
+    if ($ts === false) {
+        return t('never');
+    }
+    $diff = time() - $ts;
+    if ($diff < 45) {
+        return t('just_now');
+    }
+    $units = [
+        31536000 => 'time_years',
+        2592000 => 'time_months',
+        86400 => 'time_days',
+        3600 => 'time_hours',
+        60 => 'time_minutes',
+    ];
+    foreach ($units as $seconds => $key) {
+        $count = (int) floor($diff / $seconds);
+        if ($count >= 1) {
+            return sprintf(t($key . ($count === 1 ? '_one' : '_other')), $count);
+        }
+    }
+    return t('just_now');
+}

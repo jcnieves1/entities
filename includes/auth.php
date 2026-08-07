@@ -145,6 +145,50 @@ function stop_impersonation(): void
 }
 
 // ---------------------------------------------------------------------
+// Presence ("who's online")
+// ---------------------------------------------------------------------
+
+// A user is considered "online" if their last_seen_at is within this many
+// seconds. Kept generous relative to the write-throttle below since presence
+// here is page-load-driven, not a live heartbeat.
+const ONLINE_THRESHOLD_SECONDS = 180;
+
+/**
+ * Record that the REAL (never the impersonated) account is actively using
+ * the app right now. Throttled to at most once every 30s per session so a
+ * click-heavy user doesn't turn into a write on every single request.
+ */
+function touch_last_seen(): void
+{
+    if (empty($_SESSION['user_id'])) {
+        return;
+    }
+    $now = time();
+    if (!empty($_SESSION['last_seen_touch']) && ($now - $_SESSION['last_seen_touch']) < 30) {
+        return;
+    }
+    $_SESSION['last_seen_touch'] = $now;
+    // Compute the timestamp in PHP (as explicit UTC) rather than using SQL's
+    // NOW() - MySQL/MariaDB's NOW() reflects the DB server's own SYSTEM
+    // timezone, which on many hosts (including this app's shared hosting)
+    // does not match PHP's UTC default set in config.php. Mixing the two
+    // would silently skew every online/offline and "last seen" calculation
+    // by however many hours the two clocks disagree.
+    $stmt = db()->prepare('UPDATE users SET last_seen_at = ? WHERE id = ?');
+    $stmt->execute([gmdate('Y-m-d H:i:s', $now), (int) $_SESSION['user_id']]);
+}
+
+/** True if $lastSeenAt (a DATETIME string or null) falls within the online window. */
+function is_online(?string $lastSeenAt): bool
+{
+    if (!$lastSeenAt) {
+        return false;
+    }
+    $ts = strtotime($lastSeenAt);
+    return $ts !== false && (time() - $ts) <= ONLINE_THRESHOLD_SECONDS;
+}
+
+// ---------------------------------------------------------------------
 // Access guards
 // ---------------------------------------------------------------------
 function require_login(): void
@@ -152,6 +196,7 @@ function require_login(): void
     if (!is_logged_in()) {
         redirect('login.php');
     }
+    touch_last_seen();
 }
 
 function is_admin(): bool
